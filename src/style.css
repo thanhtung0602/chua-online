@@ -3445,7 +3445,7 @@ body.chanting-mode-active .camera-helper-hint {
 }
 
 /* ==========================================================================
-   XÁC THỰC TÀI KHOẢN (GOOGLE & FACEBOOK) & XUẤT GIA THỤ GIỚI (ĐI TU)
+   XÁC THỰC TÀI KHOẢN (GOOGLE OAUTH 2.0) & XUẤT GIA THỤ GIỚI (ĐI TU)
    ========================================================================== */
 
 /* Nút Đăng Nhập trên Header */
@@ -3611,18 +3611,6 @@ body.chanting-mode-active .camera-helper-hint {
   transform: translateY(-1px);
 }
 
-.btn-oauth.btn-facebook {
-  background: #1877f2;
-  color: #ffffff;
-  box-shadow: 0 2px 6px rgba(24, 119, 242, 0.35);
-}
-
-.btn-oauth.btn-facebook:hover {
-  background: #166fe5;
-  box-shadow: 0 4px 12px rgba(24, 119, 242, 0.5);
-  transform: translateY(-1px);
-}
-
 .oauth-svg-icon {
   flex-shrink: 0;
 }
@@ -3688,12 +3676,6 @@ body.chanting-mode-active .camera-helper-hint {
   background: rgba(66, 133, 244, 0.2);
   color: #8ab4f8;
   border: 1px solid rgba(66, 133, 244, 0.4);
-}
-
-.tag-provider.facebook {
-  background: rgba(24, 119, 242, 0.2);
-  color: #70b0ff;
-  border-color: rgba(24, 119, 242, 0.4);
 }
 
 .tag-monk {

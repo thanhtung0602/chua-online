@@ -908,7 +908,7 @@ export class GateNPCSystem {
       "A Di Đà Phật! Bần tăng Thích Trí Giác kính chào đạo hữu. Đạo hữu có phát nguyện xả bỏ duyên trần, xuống tóc xuất gia không? 🙏",
       "Kính bạch đạo hữu: Khi xuống tóc đi tu, đạo hữu sẽ xả bỏ mái tóc thế tục, cạo đầu thanh khiết, đắp y Cà Sa và mang họ Thích của Đức Bổn Sư Thích Ca Mâu Ni!",
       "Theo quy củ thiền môn: Người chơi bắt buộc phải Xuống Tóc Đi Tu mới được tấn phong làm Hòa Thượng Trụ Trì hoặc 12 Vị Cao Tăng của Chùa!",
-      "Để ghi danh vào Sổ Giới Điệp Tam Bảo lưu truyền công đức, đạo hữu cần Đăng Nhập bằng Google hoặc Facebook trước khi làm lễ Xuống Tóc nhé! 🪷",
+      "Để ghi danh vào Sổ Giới Điệp Tam Bảo lưu truyền công đức, đạo hữu cần Đăng Nhập bằng Google trước khi làm lễ Xuống Tóc nhé! 🪷",
       "Sau khi xuất gia, hãy tinh tấn tụng kinh niệm Phật, thả hoa đăng và tích lũy Điểm Công Đức để sớm được đăng tọa Pháp Tòa Trụ Trì! ✨",
     ];
 

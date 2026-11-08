@@ -186,8 +186,8 @@ export class GameUI {
               <span class="room-icon">👥</span> <b id="room-player-count">1</b> <span class="room-label-tag">Đạo Hữu</span>
             </div>
 
-            <!-- NÚT ĐĂNG NHẬP GOOGLE / FACEBOOK & HỒ SƠ -->
-            <button class="stat-badge auth-badge clickable-badge" id="btn-user-auth" title="Đăng Nhập Tài Khoản Google / Facebook">
+            <!-- NÚT ĐĂNG NHẬP GOOGLE & HỒ SƠ -->
+            <button class="stat-badge auth-badge clickable-badge" id="btn-user-auth" title="Đăng Nhập Tài Khoản Google">
               <span id="auth-btn-icon">🔑</span> <b id="auth-btn-text">Đăng Nhập</b>
             </button>
 
@@ -679,7 +679,7 @@ export class GameUI {
         </div>
       </div>
 
-      <!-- MODAL: ĐĂNG NHẬP GOOGLE & FACEBOOK -->
+      <!-- MODAL: ĐĂNG NHẬP GOOGLE -->
       <div id="modal-auth" class="modal-backdrop hidden">
         <div class="modal-box auth-modal-box">
           <div class="modal-header">
@@ -702,14 +702,6 @@ export class GameUI {
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
                   </svg>
                   <span>Tiếp tục với Google</span>
-                </button>
-
-                <!-- NÚT FACEBOOK SIGN IN -->
-                <button type="button" class="btn-oauth btn-facebook" id="btn-login-facebook">
-                  <svg class="oauth-svg-icon" viewBox="0 0 24 24" width="22" height="22">
-                    <path fill="#ffffff" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                  <span>Tiếp tục với Facebook</span>
                 </button>
               </div>
             </div>
@@ -1840,13 +1832,12 @@ export class GameUI {
       }
     });
 
-    // 16. ĐĂNG NHẬP GOOGLE & FACEBOOK THẬT 100%
+    // 16. ĐĂNG NHẬP GOOGLE THẬT 100%
     const btnUserAuth = document.getElementById("btn-user-auth");
     const modalAuth = document.getElementById("modal-auth");
     const closeAuth = document.getElementById("modal-auth-close");
     const closeAuthBtn = document.getElementById("modal-auth-close-btn");
     const btnLoginGoogle = document.getElementById("btn-login-google");
-    const btnLoginFacebook = document.getElementById("btn-login-facebook");
     const btnAuthLogout = document.getElementById("btn-auth-logout");
 
     btnUserAuth?.addEventListener("click", () => {
@@ -1909,30 +1900,6 @@ export class GameUI {
         if (btnLoginGoogle) {
           btnLoginGoogle.removeAttribute("disabled");
           btnLoginGoogle.style.opacity = "1";
-        }
-      }
-    });
-
-    // ĐĂNG NHẬP FACEBOOK THẬT (Mở popup facebook.com chính thức)
-    btnLoginFacebook?.addEventListener("click", async () => {
-      try {
-        if (btnLoginFacebook) {
-          btnLoginFacebook.setAttribute("disabled", "true");
-          btnLoginFacebook.style.opacity = "0.7";
-        }
-        const user = await authService.loginWithRealFacebook();
-        handleLoginSuccess(user, "Facebook");
-      } catch (err: any) {
-        console.error("Lỗi Facebook Login:", err);
-        alert(
-          "⚠️ THÔNG BÁO TỪ FACEBOOK / META\n\n" +
-          (err.message || err) + "\n\n" +
-          "👉 Vui lòng đảm bảo ứng dụng Facebook đã được bật sang chế độ 'Trực tiếp' (Live Mode) và thêm tên miền vào App Domains trên developers.facebook.com."
-        );
-      } finally {
-        if (btnLoginFacebook) {
-          btnLoginFacebook.removeAttribute("disabled");
-          btnLoginFacebook.style.opacity = "1";
         }
       }
     });
@@ -2051,7 +2018,7 @@ export class GameUI {
     btnConfirmOrdination?.addEventListener("click", () => {
       if (!authService.isLoggedIn()) {
         const wantLogin = confirm(
-          "Đạo hữu chưa Đăng Nhập tài khoản Google / Facebook.\n\n" +
+          "Đạo hữu chưa Đăng Nhập tài khoản Google.\n\n" +
           "👉 Bấm 'OK' để mở khung Đăng Nhập (khuyên dùng để lưu danh vào Giới Điệp Tam Bảo lâu dài).\n" +
           "👉 Bấm 'Cancel' để tiếp tục Xuất Gia ngay trên thiết bị này."
         );
@@ -3447,7 +3414,7 @@ export class GameUI {
   public openOrdinationModal() {
     if (!authService.isLoggedIn()) {
       const wantLogin = confirm(
-        "Đạo hữu chưa Đăng Nhập tài khoản Google / Facebook.\n\n" +
+        "Đạo hữu chưa Đăng Nhập tài khoản Google.\n\n" +
         "👉 Bấm 'OK' để mở khung Đăng Nhập (khuyên dùng để lưu danh vào Giới Điệp Tam Bảo lâu dài).\n" +
         "👉 Bấm 'Cancel' để tiếp tục Xuất Gia ngay trên thiết bị này."
       );
@@ -3598,14 +3565,14 @@ export class GameUI {
         } else if (user.avatarUrl && (user.avatarUrl.startsWith("http") || user.avatarUrl.startsWith("//"))) {
           avatarEl.innerHTML = `<img src="${user.avatarUrl}" alt="Avatar" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" referrerpolicy="no-referrer" />`;
         } else {
-          avatarEl.innerText = user.provider === "google" ? "G" : "f";
+          avatarEl.innerText = "G";
         }
       }
       if (nameEl) nameEl.innerText = user.dharmaName || user.name;
       if (emailEl) emailEl.innerText = user.email;
       if (providerTag) {
-        providerTag.innerText = user.provider === "google" ? "Google" : "Facebook";
-        providerTag.className = `tag-provider ${user.provider}`;
+        providerTag.innerText = "Google";
+        providerTag.className = "tag-provider google";
       }
       if (monkTag) {
         if (isMonk) {

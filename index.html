@@ -8,44 +8,6 @@
     <title>Chùa An Lạc Online – Digital Zen Sanctuary</title>
   </head>
   <body>
-    <!-- Facebook JavaScript SDK Chính Thức -->
-    <script>
-      window.fbAsyncInit = function() {
-        FB.init({
-          appId      : '2537696719976197',
-          cookie     : true,
-          xfbml      : true,
-          version    : 'v21.0'
-        });
-        FB.AppEvents.logPageView();
-        if (typeof window.onFbAsyncInitDone === 'function') {
-          window.onFbAsyncInitDone();
-        }
-      };
-
-      (function(d, s, id){
-         var js, fjs = d.getElementsByTagName(s)[0];
-         if (d.getElementById(id)) {return;}
-         js = d.createElement(s); js.id = id;
-         js.src = "https://connect.facebook.net/vi_VN/sdk.js";
-         fjs.parentNode.insertBefore(js, fjs);
-       }(document, 'script', 'facebook-jssdk'));
-
-      function statusChangeCallback(response) {
-        if (typeof window.statusChangeCallbackHandler === 'function') {
-          window.statusChangeCallbackHandler(response);
-        }
-      }
-
-      function checkLoginState() {
-        if (window.FB) {
-          FB.getLoginStatus(function(response) {
-            statusChangeCallback(response);
-          });
-        }
-      }
-    </script>
-
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
