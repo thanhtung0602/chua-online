@@ -77,8 +77,8 @@ class AuthService {
 
   private constructor() {
     this.loadFromStorage();
-    // Tải trước Google và Facebook SDK ngay khi mở trang để tránh bị trình duyệt chặn popup do độ trễ mạng
     if (typeof window !== "undefined") {
+      this.checkUrlForOAuthToken();
       setTimeout(() => {
         this.loadGoogleSDK().catch((e) =>
           console.warn("Lỗi tải trước Google SDK:", e),
@@ -90,6 +90,46 @@ class AuthService {
           );
         }
       }, 300);
+    }
+  }
+
+  private checkUrlForOAuthToken() {
+    try {
+      const hash = window.location.hash;
+      if (hash && hash.includes("access_token=")) {
+        const params = new URLSearchParams(hash.substring(1));
+        const token = params.get("access_token");
+        if (token) {
+          fetch(`https://graph.facebook.com/me?fields=id,name,picture.width(200).height(200)&access_token=${token}`)
+            .then((res) => res.json())
+            .then((userData) => {
+              if (userData && userData.id) {
+                const savedMonk = localStorage.getItem("chua_an_lac_is_monk") === "true";
+                const savedDharmaName = localStorage.getItem("chua_an_lac_dharma_name") || "";
+                const realName = userData.name || "Đạo Hữu Facebook";
+                const avatar =
+                  userData.picture?.data?.url ||
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(realName)}&background=1877f2&color=fff&size=128&bold=true`;
+                const user: UserAccount = {
+                  id: "fb_" + userData.id,
+                  provider: "facebook",
+                  name: savedMonk && savedDharmaName ? savedDharmaName : realName,
+                  email: userData.email || `fb_${userData.id}@chuaanlac.online`,
+                  avatarUrl: avatar,
+                  isMonk: savedMonk,
+                  dharmaName: savedDharmaName || undefined,
+                  joinedAt: Date.now(),
+                };
+                this.currentUser = user;
+                this.saveToStorage();
+                window.history.replaceState(null, "", window.location.pathname);
+              }
+            })
+            .catch((e) => console.warn("Lỗi đọc thông tin Facebook từ token:", e));
+        }
+      }
+    } catch (e) {
+      console.warn("Lỗi checkUrlForOAuthToken:", e);
     }
   }
 
@@ -398,37 +438,6 @@ class AuthService {
         // Chỉ dùng quyền cơ bản mặc định (public_profile), tuyệt đối không yêu cầu scope email để tránh lỗi "Invalid Scopes: email" trên Meta
       );
     });
-  }
-
-  // ─────────────────────────────────────────────
-  // ĐĂNG NHẬP NHANH BẰNG TÊN / PHÁP DANH (100% THÀNH CÔNG, KHÔNG LO LỖI OAUTH)
-  // ─────────────────────────────────────────────
-  public loginWithQuickName(name: string, email?: string): UserAccount {
-    const cleanName = name.trim() || "Đạo Hữu An Nhiên";
-    const isMonk = cleanName.startsWith("Thích ") || localStorage.getItem("chua_an_lac_is_monk") === "true";
-    const dharmaName = isMonk ? cleanName : (localStorage.getItem("chua_an_lac_dharma_name") || undefined);
-    const userEmail = email?.trim() || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, "") || "phattu"}@chuaanlac.online`;
-    const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=d97706&color=fff&size=128&bold=true`;
-
-    const user: UserAccount = {
-      id: "quick_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
-      provider: "guest",
-      name: cleanName,
-      email: userEmail,
-      avatarUrl: avatar,
-      isMonk,
-      dharmaName,
-      joinedAt: Date.now(),
-    };
-
-    this.currentUser = user;
-    if (isMonk && dharmaName) {
-      localStorage.setItem("chua_an_lac_is_monk", "true");
-      localStorage.setItem("chua_an_lac_dharma_name", dharmaName);
-    }
-    localStorage.setItem("chua_an_lac_name", cleanName);
-    this.saveToStorage();
-    return user;
   }
 
   // ─────────────────────────────────────────────

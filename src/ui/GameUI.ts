@@ -712,28 +712,6 @@ export class GameUI {
                   <span>Tiếp tục với Facebook</span>
                 </button>
               </div>
-
-              <!-- PHÂN CÁCH HOẶC ĐĂNG NHẬP NHANH -->
-              <div class="auth-divider">
-                <span>HOẶC ĐĂNG NHẬP NHANH BẰNG PHÁP DANH / TÊN</span>
-              </div>
-
-              <!-- FORM ĐĂNG NHẬP NHANH -->
-              <div class="auth-quick-login-wrap">
-                <p class="quick-login-hint">✨ Nhập tên hoặc pháp danh của bạn để vào chùa chiêm bái ngay lập tức (100% không lo lỗi OAuth):</p>
-                <div class="quick-input-row">
-                  <input
-                    type="text"
-                    id="input-quick-auth-name"
-                    class="quick-auth-input"
-                    placeholder="Ví dụ: Thích Tâm An, Diệu Tâm, v.v..."
-                    maxlength="30"
-                  />
-                  <button type="button" id="btn-quick-auth-submit" class="quick-auth-btn">
-                    Vào Chùa Ngay 🙏
-                  </button>
-                </div>
-              </div>
             </div>
 
             <!-- VIEW KHI ĐÃ ĐĂNG NHẬP -->
@@ -1919,14 +1897,14 @@ export class GameUI {
         const user = await authService.loginWithRealGoogle();
         handleLoginSuccess(user, "Google");
       } catch (err: any) {
-        console.error("Lỗi Google Login:", err);
-        const quickInput = document.getElementById("input-quick-auth-name") as HTMLInputElement | null;
-        quickInput?.focus();
-        alert(
-          "⚠️ KHÔNG THỂ KẾT NỐI GOOGLE OAUTH TRÊN TÊN MIỀN NÀY\n\n" +
-          "Lý do: Tên miền web mới trên Render chưa được thêm vào 'Authorized JavaScript Origins' trong Google Cloud Console, hoặc trình duyệt đã chặn popup.\n\n" +
-          "👉 Quý đạo hữu hãy nhập tên vào ô [ĐĂNG NHẬP NHANH BẰNG PHÁP DANH / TÊN] ngay bên dưới để vào chùa ngay lập tức 100%!"
-        );
+        if (err.message === "MISSING_GOOGLE_CLIENT_ID") {
+          alert(
+            "⚠️ CHƯA CẤU HÌNH GOOGLE CLIENT ID TRONG FILE .ENV\n\n" +
+            "Để mở cửa sổ Google đăng nhập tài khoản Gmail thật 100%, bạn cần điền VITE_GOOGLE_CLIENT_ID vào file .env."
+          );
+        } else {
+          alert(`Thông báo Google Login: ${err.message || err}`);
+        }
       } finally {
         if (btnLoginGoogle) {
           btnLoginGoogle.removeAttribute("disabled");
@@ -1946,41 +1924,16 @@ export class GameUI {
         handleLoginSuccess(user, "Facebook");
       } catch (err: any) {
         console.error("Lỗi Facebook Login:", err);
-        const quickInput = document.getElementById("input-quick-auth-name") as HTMLInputElement | null;
-        quickInput?.focus();
         alert(
-          "⚠️ KHÔNG THỂ KẾT NỐI FACEBOOK SDK TRÊN TÊN MIỀN NÀY\n\n" +
-          "Lý do: Tên miền web mới trên Render chưa được cấp phép trong Meta for Developers, hoặc trình duyệt đã chặn popup.\n\n" +
-          "👉 Quý đạo hữu hãy nhập tên vào ô [ĐĂNG NHẬP NHANH BẰNG PHÁP DANH / TÊN] ngay bên dưới để vào chùa ngay lập tức 100%!"
+          "⚠️ THÔNG BÁO TỪ FACEBOOK / META\n\n" +
+          (err.message || err) + "\n\n" +
+          "👉 Vui lòng đảm bảo ứng dụng Facebook đã được bật sang chế độ 'Trực tiếp' (Live Mode) và thêm tên miền vào App Domains trên developers.facebook.com."
         );
       } finally {
         if (btnLoginFacebook) {
           btnLoginFacebook.removeAttribute("disabled");
           btnLoginFacebook.style.opacity = "1";
         }
-      }
-    });
-
-    // 🌸 ĐĂNG NHẬP NHANH BẰNG PHÁP DANH / TÊN (100% THÀNH CÔNG)
-    const btnQuickAuthSubmit = document.getElementById("btn-quick-auth-submit");
-    const inputQuickAuthName = document.getElementById("input-quick-auth-name") as HTMLInputElement | null;
-
-    const doQuickLogin = () => {
-      const name = (inputQuickAuthName?.value || "").trim();
-      if (!name) {
-        alert("Quý đạo hữu hoan hỷ nhập tên hoặc pháp danh của mình!");
-        inputQuickAuthName?.focus();
-        return;
-      }
-      const user = authService.loginWithQuickName(name);
-      handleLoginSuccess(user, "Tài Khoản");
-    };
-
-    btnQuickAuthSubmit?.addEventListener("click", doQuickLogin);
-    inputQuickAuthName?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        doQuickLogin();
       }
     });
 
