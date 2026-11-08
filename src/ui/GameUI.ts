@@ -1433,6 +1433,17 @@ export class GameUI {
       }
     });
 
+    // Đóng menu khi chạm tay ra ngoài trên màn hình cảm ứng di động
+    document.addEventListener("pointerdown", (e) => {
+      const panel = document.getElementById("teleport-dropdown-panel");
+      if (panel && !panel.classList.contains("hidden")) {
+        const wrap = document.getElementById("teleport-menu-wrapper");
+        if (wrap && !wrap.contains(e.target as Node)) {
+          this.closeTeleportMenu();
+        }
+      }
+    });
+
     // Đóng menu khi nhấn phím Escape
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
