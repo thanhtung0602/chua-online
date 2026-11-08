@@ -401,6 +401,37 @@ class AuthService {
   }
 
   // ─────────────────────────────────────────────
+  // ĐĂNG NHẬP NHANH BẰNG TÊN / PHÁP DANH (100% THÀNH CÔNG, KHÔNG LO LỖI OAUTH)
+  // ─────────────────────────────────────────────
+  public loginWithQuickName(name: string, email?: string): UserAccount {
+    const cleanName = name.trim() || "Đạo Hữu An Nhiên";
+    const isMonk = cleanName.startsWith("Thích ") || localStorage.getItem("chua_an_lac_is_monk") === "true";
+    const dharmaName = isMonk ? cleanName : (localStorage.getItem("chua_an_lac_dharma_name") || undefined);
+    const userEmail = email?.trim() || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, "") || "phattu"}@chuaanlac.online`;
+    const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=d97706&color=fff&size=128&bold=true`;
+
+    const user: UserAccount = {
+      id: "quick_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+      provider: "guest",
+      name: cleanName,
+      email: userEmail,
+      avatarUrl: avatar,
+      isMonk,
+      dharmaName,
+      joinedAt: Date.now(),
+    };
+
+    this.currentUser = user;
+    if (isMonk && dharmaName) {
+      localStorage.setItem("chua_an_lac_is_monk", "true");
+      localStorage.setItem("chua_an_lac_dharma_name", dharmaName);
+    }
+    localStorage.setItem("chua_an_lac_name", cleanName);
+    this.saveToStorage();
+    return user;
+  }
+
+  // ─────────────────────────────────────────────
   // GHI NHẬN XUẤT GIA THỤ GIỚI (XUỐNG TÓC ĐI TU)
   // ─────────────────────────────────────────────
   public ordain(dharmaName: string, robeColor: number = 0xd97706): UserAccount {
