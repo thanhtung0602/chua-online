@@ -1766,24 +1766,21 @@ export class GameUI {
         authService.updateUser({ name: raw, dharmaName: isMonk ? raw : undefined });
       }
 
-      // Đã tạo mới nhân vật: Làm mới điểm công đức và nhiệm vụ về 0
-      this.setMeritPoints(0);
-      saveMeritPoints(raw, 0);
-      dailyActivities.resetForNewCharacter();
-      templeQuestManager.resetForNewCharacter();
+      // BẢO LƯU TRỌN VẸN ĐIỂM CÔNG ĐỨC KHI ĐỔI TÊN / PHÁP DANH
+      const currentPoints = this.getMeritPoints();
+      saveMeritPoints(raw, currentPoints);
 
       this.callbacks.onChangePlayerName?.(raw);
       const myNameEl = document.getElementById("my-standing-name");
       if (myNameEl) myNameEl.innerText = raw;
-      const myDropsEl = document.getElementById("my-standing-drops");
-      if (myDropsEl) myDropsEl.innerText = "0";
-      const myRankEl = document.getElementById("my-standing-rank");
-      if (myRankEl) myRankEl.innerText = "Chưa có điểm hôm nay";
+
+      // Cập nhật lại Bảng Xếp Hạng mới nhất từ máy chủ
+      network.requestLeaderboard();
 
       zenAudio.playLotusSound();
       this.appendChatMessage(
         "Hệ Thống",
-        `✨ Đạo hữu vừa tạo mới nhân vật: [${raw}]. Điểm công đức và bảng xếp hạng đã được làm mới về 0! 🙏`,
+        `✨ Đạo hữu vừa đổi pháp danh thành: [${raw}]. Toàn bộ Điểm Công Đức và Danh Hiệu được bảo lưu trọn vẹn! 🙏`,
       );
       this.updateRenameUIStatus();
     };

@@ -1323,13 +1323,16 @@ io.on("connection", (socket: Socket) => {
     }
   });
 
-  // 3.1. Đổi tên / Pháp danh nhân vật (Bảo lưu trọn vẹn danh hiệu Trụ Trì & Cao Tăng)
-  socket.on("player:rename", (data: { name: string }) => {
+  // 3.1. Đổi tên / Pháp danh nhân vật (Bảo lưu trọn vẹn danh hiệu Trụ Trì, Cao Tăng & Điểm Công Đức)
+  socket.on("player:rename", async (data: { name: string }) => {
     const player = players.get(socket.id);
     if (!player) return;
 
     const newName = (data.name || "").trim().slice(0, 30);
     if (!newName) return;
+
+    const oldName = player.name;
+    if (oldName === newName) return;
 
     // KIỂM TRA TRÙNG TÊN: Tuyệt đối không cho phép trùng tên với người khác!
     if (isNameAlreadyTaken(newName, socket.id)) {
@@ -1340,44 +1343,94 @@ io.on("connection", (socket: Socket) => {
       return;
     }
 
-    const oldName = player.name;
     player.name = newName;
     socket.emit("player:rename_success", { name: newName });
 
-      // Đã tạo mới nhân vật: Xóa nhân vật cũ khỏi bảng xếp hạng & reset điểm công đức về 0
-      if (oldName !== newName) {
-        delete leaderboardState.entries[oldName];
-        if (leaderboardState.currentAbbot && leaderboardState.currentAbbot.name === oldName) {
-          leaderboardState.currentAbbot = null;
-        }
-        if (Array.isArray(leaderboardState.seniorMonks)) {
-          leaderboardState.seniorMonks = leaderboardState.seniorMonks.filter((m) => m.name !== oldName);
-        }
-      }
+    // BẢO LƯU TRỌN VẸN ĐIỂM CÔNG ĐỨC, HẠNG & DANH HIỆU
+    const oldEntry = leaderboardState.entries[oldName];
+    const isMonk = newName.startsWith("Thích ") || Boolean(oldEntry?.isMonk) || Boolean(player.isMonk);
 
-      // Tạo mới nhân vật với 0 điểm công đức
-      const isMonk = newName.startsWith("Thích ");
+    if (oldEntry) {
+      delete leaderboardState.entries[oldName];
+      leaderboardState.entries[newName] = {
+        ...oldEntry,
+        name: newName,
+        isMonk,
+        lastUpdated: Date.now(),
+      };
+    } else {
       leaderboardState.entries[newName] = {
         name: newName,
         avatar: player.avatar || "male",
         camLoToday: 0,
         totalCamLo: 0,
+        totalDonated: 0,
+        donationCount: 0,
         lastUpdated: Date.now(),
         isMonk,
       };
+    }
 
-      saveLeaderboardData();
-      broadcastLeaderboard();
+    // Bảo lưu danh hiệu Trụ Trì nếu là đương kim Trụ Trì
+    if (leaderboardState.currentAbbot && leaderboardState.currentAbbot.name === oldName) {
+      leaderboardState.currentAbbot.name = newName;
+    }
 
-      socket.broadcast.emit("player:renamed", {
-        id: socket.id,
-        name: newName,
-        oldName,
+    // Bảo lưu danh hiệu Cao Tăng nếu nằm trong 12 Vị Cao Tăng
+    if (Array.isArray(leaderboardState.seniorMonks)) {
+      leaderboardState.seniorMonks.forEach((m) => {
+        if (m.name === oldName) {
+          m.name = newName;
+        }
       });
+    }
+
+    // Bảo lưu lịch sử sắc phong
+    if (Array.isArray(leaderboardState.history)) {
+      leaderboardState.history.forEach((h) => {
+        if (h.winner === oldName) {
+          h.winner = newName;
+        }
+      });
+    }
+
+    // Cập nhật tên trên chỗ ngồi trong Chính Điện nếu socket đang ngồi
+    for (const [seatId, info] of occupiedSeats.entries()) {
+      if (info.socketId === socket.id) {
+        info.playerName = newName;
+        break;
+      }
+    }
+    broadcastOccupiedSeats();
+
+    // Đồng bộ sang MongoDB Atlas: cập nhật PlayerProfile và các đơn cúng dường
+    if (isMongoConnected) {
+      try {
+        await PlayerProfileModel.updateOne(
+          { name: oldName },
+          { $set: { name: newName, isMonk } }
+        );
+        await DonationOrderModel.updateMany(
+          { playerName: oldName },
+          { $set: { playerName: newName } }
+        );
+      } catch (err) {
+        console.warn("MongoDB update rename error:", err);
+      }
+    }
+
+    saveLeaderboardData();
+    broadcastLeaderboard();
+
+    socket.broadcast.emit("player:renamed", {
+      id: socket.id,
+      name: newName,
+      oldName,
+    });
   });
 
   // 3.2. Xuất gia thụ giới (Xuống tóc đi tu & nhận pháp danh họ Thích)
-  socket.on("player:ordain", (data: { dharmaName: string; robeColor?: number; isMonk: boolean }) => {
+  socket.on("player:ordain", async (data: { dharmaName: string; robeColor?: number; isMonk: boolean }) => {
     let cleanName = (data.dharmaName || "").trim().slice(0, 30);
     if (!cleanName.startsWith("Thích ") && !cleanName.startsWith("Thích")) {
       cleanName = "Thích " + cleanName;
@@ -1424,6 +1477,43 @@ io.on("connection", (socket: Socket) => {
       };
       (leaderboardState.entries[cleanName] as any).isMonk = true;
       needLeaderboardUpdate = true;
+    }
+
+    // Bảo lưu danh hiệu Trụ Trì & Cao Tăng khi xuất gia
+    if (leaderboardState.currentAbbot && leaderboardState.currentAbbot.name === oldName) {
+      leaderboardState.currentAbbot.name = cleanName;
+      needLeaderboardUpdate = true;
+    }
+    if (Array.isArray(leaderboardState.seniorMonks)) {
+      leaderboardState.seniorMonks.forEach((m) => {
+        if (m.name === oldName) {
+          m.name = cleanName;
+          needLeaderboardUpdate = true;
+        }
+      });
+    }
+
+    for (const [seatId, info] of occupiedSeats.entries()) {
+      if (info.socketId === socket.id) {
+        info.playerName = cleanName;
+        break;
+      }
+    }
+    broadcastOccupiedSeats();
+
+    if (isMongoConnected) {
+      try {
+        await PlayerProfileModel.updateOne(
+          { name: oldName },
+          { $set: { name: cleanName, isMonk: true, dharmaName: cleanName } }
+        );
+        await DonationOrderModel.updateMany(
+          { playerName: oldName },
+          { $set: { playerName: cleanName } }
+        );
+      } catch (err) {
+        console.warn("MongoDB update ordain error:", err);
+      }
     }
 
     if (needLeaderboardUpdate) {

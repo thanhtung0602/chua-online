@@ -679,12 +679,9 @@ class ChuaAnLacGame {
       },
       onChangePlayerName: (newName: string) => {
         this.player.createNameTag(newName);
-        // Tạo mới nhân vật: Làm mới danh hiệu và bắt đầu lại
-        this.player.setIsAbbot(false);
-        this.player.setSeniorRank(0);
-
+        // Bảo lưu trọn vẹn danh hiệu Trụ Trì & Cao Tăng hiện tại của nhân vật
         network.sendRename(newName);
-        this.speechBubbles.show(this.player.group, `A Di Đà Phật! Đạo hữu hóa thân nhân vật mới: ${newName} 🙏`, 4000);
+        this.speechBubbles.show(this.player.group, `A Di Đà Phật! Đạo hữu vừa đổi pháp danh: ${newName} 🙏`, 4000);
       },
       onChangeRobeColor: (color) => {
         this.player.setRobeColor(color);
