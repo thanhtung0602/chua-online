@@ -2809,6 +2809,7 @@ export class GameUI {
   }
 
   public stopMeditation() {
+    if (!this.isMeditating && this.meditateInterval === null) return;
     this.isMeditating = false;
     if (this.meditateInterval) {
       clearInterval(this.meditateInterval);
