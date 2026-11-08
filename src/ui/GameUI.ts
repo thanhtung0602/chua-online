@@ -85,7 +85,7 @@ export class GameUI {
   public isNearPond: boolean = false;
   private isMeditating: boolean = false;
   private meditateTimer: number = 0;
-  private meditateInterval?: number;
+  private meditateInterval: number | null = null;
   private isMuted: boolean = false;
   private selectedOracleCategory: OracleCategory = "love";
   private currentOracleStick: OracleStick | null = null;
@@ -2737,13 +2737,24 @@ export class GameUI {
     if (this.isMeditating) {
       this.stopMeditation();
     } else {
-      this.startMeditation();
+      // Yêu cầu main chọn bồ đoàn và bắt đầu tọa thiền
+      this.callbacks.onActionSelect("meditate");
     }
   }
 
   public startMeditation() {
+    // Nếu đang trong trạng thái thiền và đã có timer chạy thì không khởi tạo lặp
+    if (this.isMeditating && this.meditateInterval) {
+      return;
+    }
     this.isMeditating = true;
+    if (this.meditateInterval) {
+      clearInterval(this.meditateInterval);
+      this.meditateInterval = null;
+    }
     this.meditateTimer = 0;
+    const timeDisplay = document.getElementById("zen-time");
+    if (timeDisplay) timeDisplay.innerText = "00:00";
     const card = document.getElementById("meditate-timer-card");
     if (card) card.classList.remove("hidden-card");
 
@@ -2751,7 +2762,6 @@ export class GameUI {
       zenBackgroundMusic.start();
     }
     zenAudio.playSingingBowl(432);
-    this.callbacks.onActionSelect("meditate");
 
     this.meditateInterval = window.setInterval(() => {
       this.meditateTimer++;
@@ -2759,8 +2769,8 @@ export class GameUI {
         .toString()
         .padStart(2, "0");
       const secs = (this.meditateTimer % 60).toString().padStart(2, "0");
-      const timeDisplay = document.getElementById("zen-time");
-      if (timeDisplay) timeDisplay.innerText = `${mins}:${secs}`;
+      const el = document.getElementById("zen-time");
+      if (el) el.innerText = `${mins}:${secs}`;
 
       // Mỗi 30 giây thiền cộng 1 Điểm Công Đức
       if (this.meditateTimer % 30 === 0) {
@@ -2771,7 +2781,13 @@ export class GameUI {
 
   public stopMeditation() {
     this.isMeditating = false;
-    if (this.meditateInterval) clearInterval(this.meditateInterval);
+    if (this.meditateInterval) {
+      clearInterval(this.meditateInterval);
+      this.meditateInterval = null;
+    }
+    this.meditateTimer = 0;
+    const timeDisplay = document.getElementById("zen-time");
+    if (timeDisplay) timeDisplay.innerText = "00:00";
     const card = document.getElementById("meditate-timer-card");
     if (card) card.classList.add("hidden-card");
     this.callbacks.onActionSelect("idle");

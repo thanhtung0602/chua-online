@@ -78,8 +78,9 @@ class ChuaAnLacGame {
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
 
-  // UI
+  // UI & Seating
   private gameUI!: GameUI;
+  private currentOccupiedSeat: string | null = null;
 
   constructor() {
     // 1. Renderer - Tối ưu hóa hiệu năng 60 FPS theo từng thiết bị (Mobile vs PC)
@@ -422,7 +423,11 @@ class ChuaAnLacGame {
     }
 
     // 3. Kiểm tra click vào Bồ Đoàn / Pháp Tòa trong Chính Điện
-    if (this.world.cushionMeshes && this.world.cushionMeshes.length > 0) {
+    if (this.player.action === "meditate" || this.gameUI.getIsMeditating()) {
+      // Đang ngồi thiền mà click chạm màn hình -> Xả thiền, đứng dậy thoát khỏi chỗ ngồi
+      this.gameUI.stopMeditation();
+      this.exitCushionSeat();
+    } else if (this.world.cushionMeshes && this.world.cushionMeshes.length > 0) {
       const cushionHits = this.raycaster.intersectObjects(this.world.cushionMeshes, true);
       if (cushionHits.length > 0) {
         let obj: THREE.Object3D | null = cushionHits[0].object;
@@ -510,8 +515,9 @@ class ChuaAnLacGame {
 
       // Kiểm tra vị trí đích đến có bị chặn bởi tường, ban thờ hay hồ nước không
       if (!this.world.isBlocked(pt.x, pt.z, 0.35)) {
-        if (this.player.action === "meditate") {
+        if (this.player.action === "meditate" || this.gameUI.getIsMeditating()) {
           this.gameUI.stopMeditation();
+          this.exitCushionSeat();
         }
         this.player.moveTo(pt.x, pt.z);
       }
@@ -709,6 +715,12 @@ class ChuaAnLacGame {
             this.speechBubbles.show(this.player.group, "🪔 Lòng thành kính dâng hương cúng dường Tam Bảo. (Hôm nay bạn đã dâng hương nhận công đức rồi 🙏)");
           }
         } else if (action === "cushion") {
+          // Nếu đang ngồi thiền -> Xả thiền và đứng dậy
+          if (this.player.action === "meditate" || this.gameUI.getIsMeditating()) {
+            this.gameUI.stopMeditation();
+            this.exitCushionSeat();
+            return;
+          }
           // TÌM PHÁP TÒA HOẶC BỒ ĐOÀN ĐƯỢC PHÉP NGỒI GẦN NHẤT MÀ CHƯA CÓ NGƯỜI NGỒI
           const allowedSeats = this.getPermittedCushions();
           const myId = network.getSocketId();
@@ -853,6 +865,7 @@ class ChuaAnLacGame {
         this.targetYaw = (facing === 0) ? Math.PI : 0;
       },
       onStopChanting: () => {
+        this.player.targetY = 0;
         this.player.setAction("idle");
         network.sendAction("idle");
       },
@@ -894,13 +907,19 @@ class ChuaAnLacGame {
   private handleAction(action: string) {
     if (this.player.action === "meditate" && action !== "meditate") {
       this.gameUI.stopMeditation();
-      network.leaveSeat();
+      this.exitCushionSeat();
     }
 
     if (action === "idle") {
       this.player.stopMoving();
       this.player.setAction("idle");
     } else if (action === "meditate") {
+      // Nếu đang ngồi thiền rồi mà gọi meditate -> Xả thiền và đứng dậy
+      if (this.player.action === "meditate" || this.gameUI.getIsMeditating()) {
+        this.gameUI.stopMeditation();
+        this.exitCushionSeat();
+        return;
+      }
       const inHall = this.player.worldZ <= -13.0 && this.player.worldZ >= -48.5 && Math.abs(this.player.worldX) <= 19.5;
       if (!inHall) {
         this.speechBubbles.show(
@@ -1272,6 +1291,7 @@ class ChuaAnLacGame {
     const targetY = seat ? seat.y : (fallbackY ?? 0.74);
     const facing = seatName === "seat_abbot" ? 0 : Math.PI;
 
+    this.currentOccupiedSeat = seatName;
     this.player.teleportTo(targetX, targetZ, targetY, facing);
     this.player.setAction("meditate");
     this.gameUI.startMeditation();
@@ -1299,6 +1319,38 @@ class ChuaAnLacGame {
     }
 
     return true;
+  }
+
+  /**
+   * Rời khỏi chỗ ngồi bồ đoàn hoặc pháp tòa an toàn, đứng dậy trả lại chỗ ngồi trên server
+   */
+  private exitCushionSeat() {
+    const prevSeat = this.currentOccupiedSeat;
+    this.currentOccupiedSeat = null;
+    network.leaveSeat();
+    this.player.targetY = 0;
+
+    // Đưa nhân vật bước xuống sàn an toàn, tránh bị kẹt góc bệ hoặc bàn kinh
+    if (prevSeat === "seat_abbot") {
+      this.player.worldX = 0;
+      this.player.worldZ = -30.5;
+      this.player.worldY = 0.65;
+      this.player.targetY = 0.65;
+      this.player.facingAngle = Math.PI;
+    } else if (prevSeat && prevSeat.startsWith("seat_senior_monk_")) {
+      const isLeft = prevSeat.includes("left");
+      this.player.worldX = isLeft ? -9.5 : 9.5;
+      this.player.worldZ = -29.8;
+      this.player.worldY = 0.65;
+      this.player.targetY = 0.65;
+      this.player.facingAngle = Math.PI;
+    } else {
+      this.player.targetY = 0;
+    }
+
+    if (this.player.action === "meditate") {
+      this.player.setAction("idle");
+    }
   }
 
   // ─────────────────────────────────────────────
@@ -1356,8 +1408,9 @@ class ChuaAnLacGame {
     this.gameUI.setNearPond(isNearPond);
 
     // Nếu người chơi đang thiền mà di chuyển ra ngoài Chính Điện thì tự động xả thiền
-    if (!inHall && this.gameUI.getIsMeditating()) {
+    if (!inHall && (this.gameUI.getIsMeditating() || this.player.action === "meditate")) {
       this.gameUI.stopMeditation();
+      this.exitCushionSeat();
       this.speechBubbles.show(this.player.group, "Đã rời Chính Điện, xả thiền an nhiên... 🙏");
     }
 
@@ -1423,9 +1476,9 @@ class ChuaAnLacGame {
       return;
     }
 
-    if (this.player.action === "meditate") {
+    if (this.player.action === "meditate" || this.gameUI.getIsMeditating()) {
       this.gameUI.stopMeditation();
-      network.leaveSeat();
+      this.exitCushionSeat();
     }
 
     const forwardX = -Math.sin(this.cameraYaw);
