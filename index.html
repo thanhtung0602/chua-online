@@ -18,6 +18,9 @@
           version    : 'v21.0'
         });
         FB.AppEvents.logPageView();
+        if (typeof window.onFbAsyncInitDone === 'function') {
+          window.onFbAsyncInitDone();
+        }
       };
 
       (function(d, s, id){
@@ -27,6 +30,20 @@
          js.src = "https://connect.facebook.net/vi_VN/sdk.js";
          fjs.parentNode.insertBefore(js, fjs);
        }(document, 'script', 'facebook-jssdk'));
+
+      function statusChangeCallback(response) {
+        if (typeof window.statusChangeCallbackHandler === 'function') {
+          window.statusChangeCallbackHandler(response);
+        }
+      }
+
+      function checkLoginState() {
+        if (window.FB) {
+          FB.getLoginStatus(function(response) {
+            statusChangeCallback(response);
+          });
+        }
+      }
     </script>
 
     <div id="app"></div>

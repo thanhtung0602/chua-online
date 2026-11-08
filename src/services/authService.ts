@@ -35,18 +35,42 @@ declare global {
       }) => void;
       login: (
         callback: (response: {
-          authResponse?: { accessToken: string; userID: string };
+          authResponse?: {
+            accessToken: string;
+            userID: string;
+            expiresIn?: number | string;
+            signedRequest?: string;
+          };
           status: string;
         }) => void,
         options?: { scope: string },
+      ) => void;
+      getLoginStatus: (
+        callback: (response: {
+          authResponse?: {
+            accessToken: string;
+            userID: string;
+            expiresIn?: number | string;
+            signedRequest?: string;
+          };
+          status: string;
+        }) => void,
+        roundtrip?: boolean,
       ) => void;
       api: (
         path: string,
         params: any,
         callback: (response: any) => void,
       ) => void;
+      AppEvents?: {
+        logPageView: () => void;
+      };
     };
     fbAsyncInit?: () => void;
+    onFbAsyncInitDone?: () => void;
+    checkLoginState?: () => void;
+    statusChangeCallback?: (response: any) => void;
+    statusChangeCallbackHandler?: (response: any) => void;
   }
 }
 
@@ -78,6 +102,18 @@ class AuthService {
   private constructor() {
     this.loadFromStorage();
     if (typeof window !== "undefined") {
+      // Đăng ký các hàm toàn cục chuẩn của Facebook SDK
+      window.statusChangeCallbackHandler = (res: any) => {
+        this.statusChangeCallback(res).catch((err) =>
+          console.warn("Lỗi statusChangeCallbackHandler:", err),
+        );
+      };
+      window.checkLoginState = () => {
+        this.checkLoginState().catch((err) =>
+          console.warn("Lỗi checkLoginState:", err),
+        );
+      };
+
       this.checkUrlForOAuthToken();
       setTimeout(() => {
         this.loadGoogleSDK().catch((e) =>
@@ -85,9 +121,16 @@ class AuthService {
         );
         const fbAppId = this.getFacebookAppId();
         if (fbAppId) {
-          this.loadFacebookSDK(fbAppId).catch((e) =>
-            console.warn("Lỗi tải trước Facebook SDK:", e),
-          );
+          this.loadFacebookSDK(fbAppId)
+            .then(() => {
+              // Tự động kiểm tra trạng thái Facebook nếu chưa có tài khoản đang đăng nhập
+              if (!this.isLoggedIn()) {
+                this.checkLoginState().catch((e) =>
+                  console.warn("Lỗi tự động kiểm tra Facebook login status:", e),
+                );
+              }
+            })
+            .catch((e) => console.warn("Lỗi tải trước Facebook SDK:", e));
         }
       }, 300);
     }
@@ -388,6 +431,106 @@ class AuthService {
     });
   }
 
+  /**
+   * statusChangeCallback - Xử lý phản hồi từ FB.getLoginStatus() hoặc FB.login()
+   * Phản hồi có cấu trúc chuẩn Facebook:
+   * {
+   *   status: 'connected', // hoặc 'not_authorized', 'unknown'
+   *   authResponse: {
+   *     accessToken: '...',
+   *     expiresIn: '...',
+   *     signedRequest: '...',
+   *     userID: '...'
+   *   }
+   * }
+   */
+  public async statusChangeCallback(response: {
+    status: string;
+    authResponse?: {
+      accessToken: string;
+      userID: string;
+      expiresIn?: number | string;
+      signedRequest?: string;
+    };
+  }): Promise<UserAccount | null> {
+    console.log("FB statusChangeCallback received:", response);
+
+    if (response.status === "connected" && response.authResponse) {
+      return new Promise<UserAccount>((resolve, reject) => {
+        if (!window.FB) {
+          return reject(new Error("Facebook SDK chưa sẵn sàng"));
+        }
+
+        window.FB.api(
+          "/me",
+          { fields: "id,name,picture.width(200).height(200)" },
+          (userData: any) => {
+            if (!userData || userData.error) {
+              return reject(
+                new Error(userData?.error?.message || "Lỗi đọc dữ liệu Facebook"),
+              );
+            }
+
+            const savedMonk =
+              localStorage.getItem("chua_an_lac_is_monk") === "true";
+            const savedDharmaName =
+              localStorage.getItem("chua_an_lac_dharma_name") || "";
+
+            const realName = userData.name || "Đạo Hữu Facebook";
+            const avatar =
+              userData.picture?.data?.url ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(realName)}&background=1877f2&color=fff&size=128&bold=true`;
+
+            const user: UserAccount = {
+              id: "fb_" + userData.id,
+              provider: "facebook",
+              name: savedMonk && savedDharmaName ? savedDharmaName : realName,
+              email: userData.email || `fb_${userData.id}@chuaanlac.online`,
+              avatarUrl: avatar,
+              isMonk: savedMonk,
+              dharmaName: savedDharmaName || undefined,
+              joinedAt: Date.now(),
+            };
+
+            this.currentUser = user;
+            this.saveToStorage();
+            resolve(user);
+          },
+        );
+      });
+    } else {
+      console.log(
+        response.status === "not_authorized"
+          ? "Người dùng đã đăng nhập Facebook nhưng chưa cấp quyền cho ứng dụng."
+          : "Người dùng chưa đăng nhập Facebook.",
+      );
+      return null;
+    }
+  }
+
+  /**
+   * checkLoginState - Kiểm tra trạng thái đăng nhập qua FB.getLoginStatus()
+   */
+  public async checkLoginState(): Promise<UserAccount | null> {
+    const appId = this.getFacebookAppId();
+    if (!appId) return null;
+    await this.loadFacebookSDK(appId);
+
+    if (!window.FB) return null;
+
+    return new Promise((resolve) => {
+      window.FB!.getLoginStatus(async (response) => {
+        try {
+          const user = await this.statusChangeCallback(response);
+          resolve(user);
+        } catch (e) {
+          console.warn("Lỗi trong statusChangeCallback:", e);
+          resolve(null);
+        }
+      });
+    });
+  }
+
   // ─────────────────────────────────────────────
   // ĐĂNG NHẬP FACEBOOK THẬT 100% (Mở popup facebook.com)
   // ─────────────────────────────────────────────
@@ -404,57 +547,40 @@ class AuthService {
     }
 
     return new Promise((resolve, reject) => {
-      window.FB!.login(
-        (response) => {
-          if (!response.authResponse) {
-            return reject(
-              new Error("Đạo hữu đã hủy hoặc không cấp quyền Facebook"),
-            );
-          }
+      // 1. Kiểm tra trạng thái đăng nhập hiện tại bằng FB.getLoginStatus
+      window.FB!.getLoginStatus((response) => {
+        if (response.status === "connected" && response.authResponse) {
+          // Đã đăng nhập và cấp quyền sẵn, lấy thông tin ngay không cần popup
+          this.statusChangeCallback(response)
+            .then((u) => {
+              if (u) resolve(u);
+              else reject(new Error("Không thể đọc thông tin tài khoản Facebook"));
+            })
+            .catch(reject);
+          return;
+        }
 
-          // Lấy thông tin tài khoản THẬT từ Facebook Graph API
-          // Sử dụng quyền mặc định public_profile (họ tên, id, avatar thật)
-          window.FB!.api(
-            "/me",
-            { fields: "id,name,picture.width(200).height(200)" },
-            (userData: any) => {
-              if (!userData || userData.error) {
-                return reject(
-                  new Error(
-                    userData?.error?.message || "Lỗi đọc dữ liệu Facebook",
-                  ),
-                );
-              }
-
-              const savedMonk =
-                localStorage.getItem("chua_an_lac_is_monk") === "true";
-              const savedDharmaName =
-                localStorage.getItem("chua_an_lac_dharma_name") || "";
-
-              const realName = userData.name || "Đạo Hữu Facebook";
-              const avatar =
-                userData.picture?.data?.url ||
-                `https://ui-avatars.com/api/?name=${encodeURIComponent(realName)}&background=1877f2&color=fff&size=128&bold=true`;
-
-              const user: UserAccount = {
-                id: "fb_" + userData.id,
-                provider: "facebook",
-                name: savedMonk && savedDharmaName ? savedDharmaName : realName,
-                email: userData.email || `fb_${userData.id}@chuaanlac.online`,
-                avatarUrl: avatar,
-                isMonk: savedMonk,
-                dharmaName: savedDharmaName || undefined,
-                joinedAt: Date.now(),
-              };
-
-              this.currentUser = user;
-              this.saveToStorage();
-              resolve(user);
-            },
-          );
-        },
-        // Chỉ dùng quyền cơ bản mặc định (public_profile), tuyệt đối không yêu cầu scope email để tránh lỗi "Invalid Scopes: email" trên Meta
-      );
+        // 2. Nếu chưa kết nối, mở cửa sổ đăng nhập FB.login()
+        window.FB!.login(
+          (loginRes) => {
+            if (loginRes.status === "connected" && loginRes.authResponse) {
+              this.statusChangeCallback(loginRes)
+                .then((u) => {
+                  if (u) resolve(u);
+                  else reject(new Error("Không thể đọc thông tin người dùng Facebook"));
+                })
+                .catch(reject);
+            } else {
+              reject(
+                new Error(
+                  "Đạo hữu đã hủy hoặc chưa hoàn tất cấp quyền trên Facebook.",
+                ),
+              );
+            }
+          },
+          // Quyền mặc định: public_profile
+        );
+      });
     });
   }
 
