@@ -30,6 +30,8 @@ export interface LeaderboardEntry {
   avatar: string;
   camLoToday: number;
   totalCamLo: number;
+  totalDonated?: number;
+  donationCount?: number;
   lastUpdated: number;
   isMonk?: boolean;
 }
@@ -54,6 +56,7 @@ export interface LeaderboardPayload {
   seniorMonks: SeniorMonkInfo[];
   monasticLeaderboard: LeaderboardEntry[]; // Bảng 1: Tăng Ni Xuất Gia
   layLeaderboard: LeaderboardEntry[];      // Bảng 2: Cư Sĩ Tại Gia
+  donationLeaderboard: LeaderboardEntry[]; // Bảng 3: Đại Thí Chủ Cúng Dường (Nạp nhiều nhất)
   leaderboard: LeaderboardEntry[];         // Tổng hợp
   resetCountdownSec: number;
 }
@@ -112,6 +115,7 @@ export class NetworkService {
       seniorMonks: [],
       monasticLeaderboard: [],
       layLeaderboard: [],
+      donationLeaderboard: [],
       leaderboard: [],
       resetCountdownSec: secUntilMidnight,
     };

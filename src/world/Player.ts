@@ -1057,12 +1057,15 @@ export class Player {
       }
     }
 
-    // Xoay nhân vật mượt mà theo hướng nhìn
-    this.group.rotation.y = THREE.MathUtils.lerp(
-      this.group.rotation.y,
-      this.facingAngle,
-      0.18
-    );
+    // Xoay nhân vật mượt mà, chậm rãi và đồng bộ êm ái với camera
+    let rotDiff = (this.facingAngle - this.group.rotation.y) % (Math.PI * 2);
+    if (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
+    if (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
+
+    const turnRate = this.isMoving
+      ? Math.min(1.0, dt * 4.2)
+      : Math.min(1.0, dt * 2.8);
+    this.group.rotation.y += rotDiff * turnRate;
 
     // Cập nhật cao độ mặt đất mượt mà (tránh giật cục khi bước lên bậc tam cấp hoặc sàn chính điện)
     const groundH = this.getGroundHeight(this.worldX, this.worldZ);

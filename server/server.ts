@@ -44,6 +44,8 @@ const PlayerProfileSchema = new mongoose.Schema(
     dharmaName: String,
     camLoToday: { type: Number, default: 0 },
     totalCamLo: { type: Number, default: 0 },
+    totalDonated: { type: Number, default: 0 },
+    donationCount: { type: Number, default: 0 },
     lastDate: String,
   },
   { timestamps: true }
@@ -191,6 +193,7 @@ async function completeDonationOrder(orderCode: string, source: string = "manual
 
   const playerName = order.playerName;
   const points = Number(order.meritPoints) || 100;
+  const donationAmount = Number(order.amount) || 0;
   const todayStr = getVietnamDateString();
 
   // 1. Cập nhật hồ sơ trên MongoDB Atlas
@@ -199,7 +202,12 @@ async function completeDonationOrder(orderCode: string, source: string = "manual
       await PlayerProfileModel.findOneAndUpdate(
         { name: playerName },
         {
-          $inc: { camLoToday: points, totalCamLo: points },
+          $inc: {
+            camLoToday: points,
+            totalCamLo: points,
+            totalDonated: donationAmount,
+            donationCount: 1,
+          },
           $set: { lastDate: todayStr },
         },
         { upsert: true, new: true }
@@ -216,12 +224,16 @@ async function completeDonationOrder(orderCode: string, source: string = "manual
       avatar: "female",
       camLoToday: points,
       totalCamLo: points,
+      totalDonated: donationAmount,
+      donationCount: 1,
       lastUpdated: Date.now(),
       isMonk: playerName.startsWith("Thích "),
     };
   } else {
     leaderboardState.entries[playerName].camLoToday = (leaderboardState.entries[playerName].camLoToday || 0) + points;
     leaderboardState.entries[playerName].totalCamLo = (leaderboardState.entries[playerName].totalCamLo || 0) + points;
+    leaderboardState.entries[playerName].totalDonated = (leaderboardState.entries[playerName].totalDonated || 0) + donationAmount;
+    leaderboardState.entries[playerName].donationCount = (leaderboardState.entries[playerName].donationCount || 0) + 1;
     leaderboardState.entries[playerName].lastUpdated = Date.now();
   }
 
@@ -295,6 +307,8 @@ export interface LeaderboardEntry {
   avatar: string;
   camLoToday: number;
   totalCamLo: number;
+  totalDonated?: number;
+  donationCount?: number;
   lastUpdated: number;
   isMonk?: boolean;
 }
@@ -407,6 +421,8 @@ function loadLeaderboardData(): LeaderboardState {
                 avatar: v.avatar || "female",
                 camLoToday: typeof v.camLoToday === "number" ? v.camLoToday : 0,
                 totalCamLo: typeof v.totalCamLo === "number" ? v.totalCamLo : 0,
+                totalDonated: typeof v.totalDonated === "number" ? v.totalDonated : 0,
+                donationCount: typeof v.donationCount === "number" ? v.donationCount : 0,
                 lastUpdated: typeof v.lastUpdated === "number" ? v.lastUpdated : Date.now(),
                 isMonk: Boolean(v.isMonk || (v.name && v.name.startsWith("Thích "))),
               };
@@ -532,6 +548,35 @@ async function initMongoConnection() {
       });
       console.log("✨ [MongoDB Atlas] Đã khởi tạo bản ghi Bảng Xếp Hạng đầu tiên trên Cloud MongoDB.");
     }
+
+    // Tự động tổng hợp và đồng bộ danh sách cúng dường từ các đơn đã hoàn tất trên Cloud
+    try {
+      const donationAgg = await DonationOrderModel.aggregate([
+        { $match: { status: "completed" } },
+        { $group: { _id: "$playerName", totalAmount: { $sum: "$amount" }, count: { $sum: 1 } } },
+      ]);
+      for (const d of donationAgg) {
+        if (leaderboardState.entries[d._id]) {
+          leaderboardState.entries[d._id].totalDonated = d.totalAmount;
+          leaderboardState.entries[d._id].donationCount = d.count;
+        } else {
+          leaderboardState.entries[d._id] = {
+            name: d._id,
+            avatar: "female",
+            camLoToday: 0,
+            totalCamLo: 0,
+            totalDonated: d.totalAmount,
+            donationCount: d.count,
+            lastUpdated: Date.now(),
+            isMonk: d._id.startsWith("Thích "),
+          };
+        }
+      }
+      saveLeaderboardData();
+      broadcastLeaderboard();
+    } catch (aggErr) {
+      console.warn("Lỗi tổng hợp dữ liệu cúng dường:", aggErr);
+    }
   } catch (err: any) {
     console.warn("⚠️ [MongoDB Atlas] Chưa thể kết nối Cloud MongoDB, hệ thống dùng Local Fallback:", err.message);
   }
@@ -647,12 +692,18 @@ function getLeaderboardPayload() {
     });
   }
 
+  // 3. BẢNG ĐẠI THÍ CHỦ CÚNG DƯỜNG TAM BẢO (Nạp / Cúng Dường Nhiều Nhất)
+  const donationLeaderboard = allEntries
+    .filter((e) => (e.totalDonated && e.totalDonated > 0) || (e.donationCount && e.donationCount > 0))
+    .sort((a, b) => (b.totalDonated || 0) - (a.totalDonated || 0) || (b.totalCamLo || 0) - (a.totalCamLo || 0));
+
   return {
     currentDate: leaderboardState.currentDate,
     currentAbbot: abbot,
     seniorMonks,
     monasticLeaderboard: monasticLeaderboard.slice(0, 50),
     layLeaderboard: layLeaderboard.slice(0, 50),
+    donationLeaderboard: donationLeaderboard.slice(0, 50),
     leaderboard: allEntries.slice(0, 50),
     resetCountdownSec: getSecondsUntilMidnight(),
   };

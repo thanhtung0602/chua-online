@@ -168,7 +168,7 @@ export class GameUI {
     : "Đạo Hữu An Nhiên";
   public playerGender: "male" | "female" = "male";
   public latestLeaderboard?: LeaderboardPayload;
-  public activeLeaderboardTab: "monk" | "lay" = "monk";
+  public activeLeaderboardTab: "monk" | "lay" | "donor" = "monk";
   public currentTimeMode: "day" | "night" = "night";
   private countdownTimerInterval?: number;
   private secondsUntilMidnight: number = 0;
@@ -941,7 +941,7 @@ export class GameUI {
               </div>
             </div>
 
-            <!-- 2. TAB SWITCHER 2 BẢNG XẾP HẠNG -->
+            <!-- 2. TAB SWITCHER 3 BẢNG XẾP HẠNG -->
             <div class="leaderboard-tab-bar">
               <button type="button" class="lb-tab-btn active" id="tab-lb-monk" data-tab="monk">
                 <span class="tab-icon">🪷</span>
@@ -952,6 +952,11 @@ export class GameUI {
                 <span class="tab-icon">🌸</span>
                 <span class="tab-text">Cư Sĩ Tại Gia</span>
                 <span class="tab-count" id="lay-count-badge">0</span>
+              </button>
+              <button type="button" class="lb-tab-btn highlight-gold-tab" id="tab-lb-donor" data-tab="donor">
+                <span class="tab-icon">👑</span>
+                <span class="tab-text">Đại Thí Chủ Cúng Dường</span>
+                <span class="tab-count" id="donor-count-badge">0</span>
               </button>
             </div>
 
@@ -1029,6 +1034,44 @@ export class GameUI {
               </div>
             </div>
 
+            <!-- TAB 3: ĐẠI THÍ CHỦ CÚNG DƯỜNG TAM BẢO (NẠP NHIỀU NHẤT) -->
+            <div id="leaderboard-tab-donor-content" class="lb-tab-content hidden">
+              <!-- CARD ĐỆ NHẤT ĐẠI THÍ CHỦ -->
+              <div class="donor-spotlight-card" id="donor-spotlight-card">
+                <div class="donor-card-badge">👑 ĐỆ NHẤT ĐẠI THÍ CHỦ CÚNG DƯỜNG TAM BẢO</div>
+                <div class="donor-card-content">
+                  <div class="donor-avatar-wrap">
+                    <span class="donor-avatar-icon" id="donor-avatar-icon">👑</span>
+                  </div>
+                  <div class="donor-details">
+                    <h4 class="donor-name" id="donor-top1-name">Chưa có Thí Chủ</h4>
+                    <div class="donor-score-row">
+                      <span>Tổng tịnh tài cúng dường:</span>
+                      <b class="donor-score" id="donor-top1-amount">0 đ</b>
+                    </div>
+                    <div class="donor-privilege" id="donor-top1-desc">
+                      ✨ Tán Thán: Đại Thí Chủ Kim Cương • Hộ Trì Thiền Môn Thường Trụ • Phúc Lạc Vô Biên
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- DANH SÁCH BẢNG VÀNG THÍ CHỦ -->
+              <div class="leaderboard-list-section">
+                <div class="leaderboard-list-title">
+                  <span>👑 Bảng Vàng Đại Thí Chủ Hộ Trì Chùa An Lạc</span>
+                  <button type="button" class="btn-quick-donate-gold" id="btn-lb-open-donation">
+                    🪷 Phát Tâm Cúng Dường
+                  </button>
+                </div>
+                <div class="leaderboard-items-container" id="leaderboard-donor-items-container">
+                  <div class="leaderboard-loading" style="text-align: center; color: #cbd5e1; padding: 16px 0;">
+                    Đang đồng bộ danh sách Thí Chủ cúng dường...
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- 4. THÔNG TIN CÔNG ĐỨC CỦA BẠN -->
             <div class="my-standing-card">
               <div class="my-standing-info">
@@ -1070,7 +1113,12 @@ export class GameUI {
                 <span class="donation-sub">Phát Tâm Cúng Dường • Tích Lũy Phước Đức • Hộ Trì Thiền Môn</span>
               </div>
             </div>
-            <button class="modal-close" id="modal-donation-close">✕</button>
+            <div class="donation-header-right-tools">
+              <button type="button" class="btn-header-view-leaderboard" id="btn-view-donor-leaderboard" title="Xem Bảng Vàng Đại Thí Chủ Cúng Dường">
+                🏆 Bảng Vàng Thí Chủ
+              </button>
+              <button class="modal-close" id="modal-donation-close">✕</button>
+            </div>
           </div>
 
           <div class="modal-body donation-modal-body">
@@ -1976,12 +2024,24 @@ export class GameUI {
       }
     });
 
-    // Chuyển đổi giữa 2 bảng xếp hạng: Tăng Ni Xuất Gia & Cư Sĩ Tại Gia
+    // Chuyển đổi giữa 3 bảng xếp hạng: Tăng Ni Xuất Gia & Cư Sĩ Tại Gia & Đại Thí Chủ Cúng Dường
     document.getElementById("tab-lb-monk")?.addEventListener("click", () => {
       this.switchLeaderboardTab("monk");
     });
     document.getElementById("tab-lb-lay")?.addEventListener("click", () => {
       this.switchLeaderboardTab("lay");
+    });
+    document.getElementById("tab-lb-donor")?.addEventListener("click", () => {
+      this.switchLeaderboardTab("donor");
+    });
+    document.getElementById("btn-lb-open-donation")?.addEventListener("click", () => {
+      this.closeLeaderboardModal();
+      this.openDonationModal();
+    });
+    document.getElementById("btn-view-donor-leaderboard")?.addEventListener("click", () => {
+      this.closeDonationModal();
+      this.openLeaderboardModal();
+      this.switchLeaderboardTab("donor");
     });
 
     // 14.05. Hòm Công Đức & Cúng Dường Tam Bảo (VietQR Tự Động)
@@ -3143,29 +3203,31 @@ export class GameUI {
     }
   }
 
-  public switchLeaderboardTab(tab: "monk" | "lay") {
+  public switchLeaderboardTab(tab: "monk" | "lay" | "donor") {
     this.activeLeaderboardTab = tab;
     const tabMonk = document.getElementById("tab-lb-monk");
     const tabLay = document.getElementById("tab-lb-lay");
+    const tabDonor = document.getElementById("tab-lb-donor");
     const contentMonk = document.getElementById("leaderboard-tab-monk-content");
     const contentLay = document.getElementById("leaderboard-tab-lay-content");
+    const contentDonor = document.getElementById("leaderboard-tab-donor-content");
     const ruleNote = document.getElementById("leaderboard-rule-note");
 
-    if (tab === "monk") {
-      tabMonk?.classList.add("active");
-      tabLay?.classList.remove("active");
-      contentMonk?.classList.remove("hidden");
-      contentLay?.classList.add("hidden");
-      if (ruleNote) {
+    tabMonk?.classList.toggle("active", tab === "monk");
+    tabLay?.classList.toggle("active", tab === "lay");
+    tabDonor?.classList.toggle("active", tab === "donor");
+
+    contentMonk?.classList.toggle("hidden", tab !== "monk");
+    contentLay?.classList.toggle("hidden", tab !== "lay");
+    contentDonor?.classList.toggle("hidden", tab !== "donor");
+
+    if (ruleNote) {
+      if (tab === "monk") {
         ruleNote.innerHTML = "🪷 <b>Quy chế thiền môn:</b> Chỉ người <b>ĐÃ XUẤT GIA ĐI TU (Họ Thích)</b> mới được tấn phong <b>HÒA THƯỢNG TRỤ TRÌ</b> (Hạng 1) và <b>12 VỊ CAO TĂNG</b> (Hạng 2-13). Hạng 14 trở đi là <b>Hòa Thượng Tăng Chúng</b>. (Reset 00:00 hằng ngày).";
-      }
-    } else {
-      tabLay?.classList.add("active");
-      tabMonk?.classList.remove("active");
-      contentLay?.classList.remove("hidden");
-      contentMonk?.classList.add("hidden");
-      if (ruleNote) {
+      } else if (tab === "lay") {
         ruleNote.innerHTML = "🌸 <b>Phước Báu Cư Sĩ:</b> Thiện Nam Tín Nữ tu học tại gia tích lũy Điểm Công Đức được tấn phong: <b>Chánh Hộ Pháp</b> (#1), <b>Phó Hộ Pháp & Đại Thiện Tri Thức</b> (#2-3), <b>Tinh Tấn Cư Sĩ</b> (#4-10), và <b>Thiện Tín Cư Sĩ</b>. (Reset 00:00 hằng ngày).";
+      } else {
+        ruleNote.innerHTML = "👑 <b>Bảng Vàng Đại Thí Chủ:</b> Tôn vinh các đạo hữu phát tâm cúng dường Tam Bảo nhiều nhất qua Hòm Công Đức. Tịnh tài hộ trì thiền môn thường trụ, phước đức lưu danh muôn thuở! 🙏✨";
       }
     }
   }
@@ -3188,17 +3250,20 @@ export class GameUI {
     // 2. Bắt đầu đếm ngược thời gian reset lúc 00:00
     this.startCountdown(payload.resetCountdownSec);
 
-    // Lọc 2 danh sách riêng biệt
+    // Lọc 3 danh sách riêng biệt
     const monasticList = payload.monasticLeaderboard ||
       payload.leaderboard?.filter((e) => e.isMonk || (e.name && e.name.startsWith("Thích "))) || [];
     const layList = payload.layLeaderboard ||
       payload.leaderboard?.filter((e) => !(e.isMonk || (e.name && e.name.startsWith("Thích ")))) || [];
+    const donorList = payload.donationLeaderboard || [];
 
-    // Cập nhật số lượng trên 2 tab
+    // Cập nhật số lượng trên 3 tab
     const monkCountBadge = document.getElementById("monk-count-badge");
     if (monkCountBadge) monkCountBadge.innerText = monasticList.length.toString();
     const layCountBadge = document.getElementById("lay-count-badge");
     if (layCountBadge) layCountBadge.innerText = layList.length.toString();
+    const donorCountBadge = document.getElementById("donor-count-badge");
+    if (donorCountBadge) donorCountBadge.innerText = donorList.length.toString();
 
     // 3. ĐƯƠNG KIM HÒA THƯỢNG TRỤ TRÌ (BẢNG XUẤT GIA)
     const abbotNameEl = document.getElementById("abbot-display-name");
@@ -3355,6 +3420,87 @@ export class GameUI {
           `;
         });
         layContainer.innerHTML = layHtml;
+      }
+    }
+
+    // 6.5. RENDER BẢNG 3: ĐẠI THÍ CHỦ CÚNG DƯỜNG TAM BẢO (NẠP NHIỀU NHẤT)
+    const donorContainer = document.getElementById("leaderboard-donor-items-container");
+    const donorTop1NameEl = document.getElementById("donor-top1-name");
+    const donorTop1AmountEl = document.getElementById("donor-top1-amount");
+    const donorTop1DescEl = document.getElementById("donor-top1-desc");
+
+    if (donorList.length > 0) {
+      const top1 = donorList[0];
+      const amtStr = Number(top1.totalDonated || 0).toLocaleString("vi-VN");
+      if (donorTop1NameEl) donorTop1NameEl.innerText = top1.name;
+      if (donorTop1AmountEl) donorTop1AmountEl.innerText = `${amtStr} VNĐ`;
+      if (donorTop1DescEl) {
+        donorTop1DescEl.innerHTML = `✨ Danh hiệu: <b>Đệ Nhất Kim Cương Đại Thí Chủ</b> • Đã cúng dường <b>${top1.donationCount || 1}</b> lần (+${(top1.totalCamLo || 0).toLocaleString()} Điểm Công Đức)`;
+      }
+    } else {
+      if (donorTop1NameEl) donorTop1NameEl.innerText = "Chưa có Thí Chủ";
+      if (donorTop1AmountEl) donorTop1AmountEl.innerText = "0 đ";
+      if (donorTop1DescEl) {
+        donorTop1DescEl.innerText = "Hãy là người đầu tiên phát tâm cúng dường nơi Hòm Công Đức để được lưu danh Bảng Vàng!";
+      }
+    }
+
+    if (donorContainer) {
+      if (donorList.length === 0) {
+        donorContainer.innerHTML = `
+          <div class="leaderboard-empty" style="text-align: center; color: #94a3b8; padding: 24px 0; font-size: 13.5px;">
+            🪷 Hiện chưa có đạo hữu nào cúng dường Tam Bảo.<br/>Hãy chạm vào <b>Hòm Công Đức</b> bên cạnh bục Pháp Tòa để gieo duyên lành và lưu danh Bảng Vàng! 🙏✨
+          </div>
+        `;
+      } else {
+        let donorHtml = "";
+        donorList.forEach((entry, idx) => {
+          const rank = idx + 1;
+          const isSelf = entry.name === this.playerName;
+          const rowClass = `leaderboard-row rank-${rank === 1 ? "1" : rank <= 3 ? "senior" : "other"} ${isSelf ? "is-self" : ""}`;
+
+          let rankBadge = `<span class="rank-num">#${rank}</span>`;
+          let titleTag = "";
+
+          if (rank === 1) {
+            rankBadge = `<span class="rank-crown" title="Đệ Nhất Kim Cương Đại Thí Chủ">👑 #1</span>`;
+            titleTag = `<span class="top1-crown-tag donor-top1-tag">👑 Đệ Nhất Đại Thí Chủ</span>`;
+          } else if (rank === 2) {
+            rankBadge = `<span class="rank-medal silver">🥈 #2</span>`;
+            titleTag = `<span class="senior-monk-tag donor-top2-tag">🪷 Kim Cương Đại Thí Chủ</span>`;
+          } else if (rank === 3) {
+            rankBadge = `<span class="rank-medal bronze">🥉 #3</span>`;
+            titleTag = `<span class="senior-monk-tag donor-top3-tag">✨ Vạn Duyên Thí Chủ</span>`;
+          } else if (rank <= 10) {
+            rankBadge = `<span class="rank-num senior-rank">#${rank}</span>`;
+            titleTag = `<span class="lay-disciple-tag donor-top10-tag">🌸 Thượng Đẳng Thí Chủ</span>`;
+          } else {
+            rankBadge = `<span class="rank-num">#${rank}</span>`;
+            titleTag = `<span class="lay-disciple-tag">🌿 Thí Chủ Hộ Trì</span>`;
+          }
+
+          const avatarIcon = "👑";
+          const selfTag = isSelf ? `<span class="self-tag">(Bạn)</span>` : "";
+          const amountStr = Number(entry.totalDonated || 0).toLocaleString("vi-VN");
+
+          donorHtml += `
+            <div class="${rowClass}">
+              <div class="lb-left">
+                ${rankBadge}
+                <span class="lb-avatar">${avatarIcon}</span>
+                <div class="lb-name-group">
+                  <span class="lb-player-name">${entry.name} ${selfTag}</span>
+                  ${titleTag}
+                </div>
+              </div>
+              <div class="lb-right donor-right">
+                <b class="lb-drops donor-amount">${amountStr}</b>
+                <span class="lb-unit donor-currency">VNĐ</span>
+              </div>
+            </div>
+          `;
+        });
+        donorContainer.innerHTML = donorHtml;
       }
     }
 

@@ -1539,8 +1539,8 @@ class ChuaAnLacGame {
     if (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
     if (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
 
-    // Tốc độ bám theo êm ái, chậm rãi, hoàn toàn không gây chóng mặt
-    const followSpeed = this.player.isMoving ? 0.025 : 0.015;
+    // Tốc độ bám theo êm ái, chậm rãi, đồng bộ với hướng quay của nhân vật (không chóng mặt)
+    const followSpeed = this.player.isMoving ? 0.042 : 0.025;
     this.cameraYaw += angleDiff * followSpeed;
 
     this.cameraPitch = THREE.MathUtils.lerp(this.cameraPitch, this.targetPitch, 0.05);
