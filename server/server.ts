@@ -4,6 +4,53 @@ import { Server, Socket } from "socket.io";
 import cors from "cors";
 import fs from "fs";
 import path from "path";
+import dns from "dns";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+// Đảm bảo DNS SRV phân giải chính xác tới cụm MongoDB Atlas trên mọi mạng / môi trường
+try {
+  dns.setServers(["8.8.8.8", "1.1.1.1"]);
+} catch (e) {
+  console.warn("DNS setServers:", e);
+}
+
+import mongoose from "mongoose";
+
+const MONGODB_URI =
+  process.env.MONGODB_URI ||
+  "mongodb+srv://lethanhtungdb05_db_user:Letung123.@annhien.rbaml2a.mongodb.net/chua_an_lac?retryWrites=true&w=majority";
+
+// Mongoose Models cho Bảng Xếp Hạng & Hồ Sơ Đạo Hữu
+const LeaderboardDocSchema = new mongoose.Schema(
+  {
+    docId: { type: String, default: "active_leaderboard", unique: true },
+    currentDate: String,
+    currentAbbot: Object,
+    seniorMonks: Array,
+    entries: Object,
+    history: Array,
+  },
+  { timestamps: true }
+);
+const LeaderboardModel = mongoose.model("LeaderboardDoc", LeaderboardDocSchema);
+
+const PlayerProfileSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, unique: true, index: true },
+    avatar: String,
+    isMonk: Boolean,
+    dharmaName: String,
+    camLoToday: { type: Number, default: 0 },
+    totalCamLo: { type: Number, default: 0 },
+    lastDate: String,
+  },
+  { timestamps: true }
+);
+const PlayerProfileModel = mongoose.model("PlayerProfile", PlayerProfileSchema);
+
+let isMongoConnected = false;
 
 const app = express();
 const server = http.createServer(app);
@@ -205,6 +252,85 @@ function saveLeaderboardData() {
     fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(leaderboardState, null, 2), "utf-8");
   } catch (e) {
     console.error("❌ Không thể ghi file leaderboard_data.json:", e);
+  }
+
+  // Đồng bộ đám mây MongoDB Atlas
+  if (isMongoConnected) {
+    LeaderboardModel.updateOne(
+      { docId: "active_leaderboard" },
+      {
+        $set: {
+          currentDate: leaderboardState.currentDate,
+          currentAbbot: leaderboardState.currentAbbot,
+          seniorMonks: leaderboardState.seniorMonks,
+          entries: leaderboardState.entries,
+          history: leaderboardState.history,
+        },
+      },
+      { upsert: true }
+    ).catch((e) => console.warn("⚠️ [MongoDB] Lỗi lưu Leaderboard:", e.message));
+  }
+}
+
+function syncPlayerToMongo(name: string, entry?: LeaderboardEntry) {
+  if (!isMongoConnected || !name) return;
+  const target = entry || leaderboardState.entries[name];
+  if (!target) return;
+  const todayStr = getVietnamDateString();
+  PlayerProfileModel.updateOne(
+    { name },
+    {
+      $set: {
+        avatar: target.avatar,
+        isMonk: target.isMonk,
+        camLoToday: target.camLoToday,
+        totalCamLo: target.totalCamLo,
+        lastDate: todayStr,
+      },
+    },
+    { upsert: true }
+  ).catch((e) => console.warn("⚠️ [MongoDB] Lỗi lưu PlayerProfile:", e.message));
+}
+
+async function initMongoConnection() {
+  try {
+    await mongoose.connect(MONGODB_URI);
+    isMongoConnected = true;
+    console.log("🌸 [MongoDB Atlas] Kết nối thành công! Đã kết nối cơ sở dữ liệu Cloud: annhien (chua_an_lac).");
+
+    const cloudDoc = await LeaderboardModel.findOne({ docId: "active_leaderboard" });
+    if (cloudDoc) {
+      const todayStr = getVietnamDateString();
+      if (cloudDoc.currentDate === todayStr) {
+        if (cloudDoc.entries && typeof cloudDoc.entries === "object") {
+          leaderboardState.entries = { ...(cloudDoc.entries as any), ...leaderboardState.entries };
+        }
+        if (cloudDoc.currentAbbot) leaderboardState.currentAbbot = cloudDoc.currentAbbot as any;
+        if (Array.isArray(cloudDoc.seniorMonks)) leaderboardState.seniorMonks = cloudDoc.seniorMonks as any;
+        if (Array.isArray(cloudDoc.history)) leaderboardState.history = cloudDoc.history as any;
+      } else {
+        if (cloudDoc.entries && typeof cloudDoc.entries === "object") {
+          leaderboardState.entries = { ...(cloudDoc.entries as any), ...leaderboardState.entries };
+        }
+        leaderboardState.currentDate = cloudDoc.currentDate || todayStr;
+        checkDailyReset();
+      }
+      saveLeaderboardData();
+      broadcastLeaderboard();
+      console.log(`✨ [MongoDB Atlas] Đã nạp thành công Bảng Xếp Hạng & Công Đức của ${Object.keys(leaderboardState.entries).length} người chơi từ Cloud.`);
+    } else {
+      await LeaderboardModel.create({
+        docId: "active_leaderboard",
+        currentDate: leaderboardState.currentDate,
+        currentAbbot: leaderboardState.currentAbbot,
+        seniorMonks: leaderboardState.seniorMonks,
+        entries: leaderboardState.entries,
+        history: leaderboardState.history,
+      });
+      console.log("✨ [MongoDB Atlas] Đã khởi tạo bản ghi Bảng Xếp Hạng đầu tiên trên Cloud MongoDB.");
+    }
+  } catch (err: any) {
+    console.warn("⚠️ [MongoDB Atlas] Chưa thể kết nối Cloud MongoDB, hệ thống dùng Local Fallback:", err.message);
   }
 }
 
@@ -533,6 +659,7 @@ io.on("connection", (socket: Socket) => {
     }
 
     saveLeaderboardData();
+    syncPlayerToMongo(name, leaderboardState.entries[name]);
     broadcastLeaderboard();
 
     // Thông báo tán thán công đức nếu lượng cam lộ lớn
@@ -555,6 +682,7 @@ io.on("connection", (socket: Socket) => {
       leaderboardState.entries[name].totalCamLo = Math.max(0, leaderboardState.entries[name].totalCamLo - amount);
       leaderboardState.entries[name].lastUpdated = Date.now();
       saveLeaderboardData();
+      syncPlayerToMongo(name, leaderboardState.entries[name]);
       broadcastLeaderboard();
       console.log(`⚠️ Khấu trừ -${amount} Điểm Công Đức của [${name}] (${data.reason || "Hủy nhiệm vụ"})`);
     }
@@ -624,6 +752,7 @@ io.on("connection", (socket: Socket) => {
           isMonk: isPlayerMonk,
         };
         saveLeaderboardData();
+        syncPlayerToMongo(uniqueName, leaderboardState.entries[uniqueName]);
         broadcastLeaderboard();
       } else {
         let changed = false;
@@ -639,8 +768,26 @@ io.on("connection", (socket: Socket) => {
         }
         if (changed) {
           saveLeaderboardData();
+          syncPlayerToMongo(uniqueName, leaderboardState.entries[uniqueName]);
           broadcastLeaderboard();
         }
+      }
+
+      if (isMongoConnected) {
+        PlayerProfileModel.findOne({ name: uniqueName }).then((profile) => {
+          if (profile) {
+            const todayStr = getVietnamDateString();
+            const cloudToday = profile.lastDate === todayStr ? (profile.camLoToday || 0) : 0;
+            const bestToday = Math.max(cloudToday, clientPoints, leaderboardState.entries[uniqueName]?.camLoToday || 0);
+            const bestTotal = Math.max(profile.totalCamLo || 0, leaderboardState.entries[uniqueName]?.totalCamLo || 0, bestToday);
+            if (leaderboardState.entries[uniqueName]) {
+              leaderboardState.entries[uniqueName].camLoToday = bestToday;
+              leaderboardState.entries[uniqueName].totalCamLo = bestTotal;
+              saveLeaderboardData();
+              broadcastLeaderboard();
+            }
+          }
+        }).catch(() => {});
       }
     }
 
@@ -998,6 +1145,7 @@ io.on("connection", (socket: Socket) => {
 
 server.listen(PORT, () => {
   console.log(`🛕 Máy chủ Chùa An Lạc Online v${APP_VERSION} đang lắng nghe tại cổng http://localhost:${PORT}`);
+  initMongoConnection();
 });
 
 // Xử lý Graceful Shutdown khi reload/redeploy trên Cloud (Render, Railway, Docker, PM2)
@@ -1008,6 +1156,12 @@ function handleGracefulShutdown(signal: string) {
     console.log("💾 Đã lưu dữ liệu bảng xếp hạng và công đức thành công.");
   } catch (err) {
     console.error("❌ Lỗi khi lưu dữ liệu trước khi tắt:", err);
+  }
+
+  if (isMongoConnected) {
+    try {
+      mongoose.disconnect();
+    } catch {}
   }
 
   // Báo trước cho client tự động chuẩn bị reconnect
