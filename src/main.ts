@@ -23,7 +23,7 @@ import { GateNPCSystem } from "./world/GateNPCSystem";
 import { QuestZoneSystem } from "./world/QuestZoneSystem";
 import { network } from "./services/network";
 import { zenAudio } from "./utils/audio";
-import { dailyActivities, saveMeritPoints } from "./utils/dailyActivities";
+import { dailyActivities, getSavedMeritPoints, saveMeritPoints } from "./utils/dailyActivities";
 import { GameUI } from "./ui/GameUI";
 import { generateUniqueGuestName } from "./utils/nameGenerator";
 import { authService } from "./services/authService";
@@ -189,8 +189,10 @@ class ChuaAnLacGame {
     // Nhân vật chính Chibi:
     let initialPlayerName: string;
     if (authService.isLoggedIn()) {
+      const savedCustomName = localStorage.getItem("chua_an_lac_player_name") || "";
       initialPlayerName =
         authService.getDharmaName() ||
+        (savedCustomName && savedCustomName !== "Đạo Hữu An Nhiên" ? savedCustomName : "") ||
         authService.getCurrentUser()?.name ||
         "Đạo Hữu";
     } else {
@@ -1045,13 +1047,15 @@ class ChuaAnLacGame {
 
   private setupNetworking() {
     const avatarType = this.player.gender === "female" ? "chibi_female" : "chibi_gray";
+    const initialCamLo = authService.isLoggedIn() ? getSavedMeritPoints(this.player.name) : 0;
     network.joinWorld(
       this.player.name,
       avatarType,
       this.player.worldX,
       this.player.worldZ,
       this.player.isMonk || this.player.name.startsWith("Thích "),
-      authService.isLoggedIn()
+      authService.isLoggedIn(),
+      initialCamLo
     );
 
     network.onPlayerJoined((remote) => {

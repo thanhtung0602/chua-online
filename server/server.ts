@@ -599,6 +599,7 @@ io.on("connection", (socket: Socket) => {
     players.set(socket.id, player);
 
     // Xử lý điểm công đức & bảng xếp hạng khi gia nhập:
+    const clientPoints = Math.max(0, Number((data as any).camLoToday) || 0);
     if (!isLoggedIn) {
       // Khách vãng lai chưa đăng nhập: Luôn reset điểm công đức về 0
       leaderboardState.entries[uniqueName] = {
@@ -612,22 +613,34 @@ io.on("connection", (socket: Socket) => {
       saveLeaderboardData();
       broadcastLeaderboard();
     } else {
-      // Người dùng đã đăng nhập: Ghi nhận vào cơ sở dữ liệu nếu chưa có
+      // Người dùng đã đăng nhập: Khôi phục và đồng bộ điểm công đức thật
       if (!leaderboardState.entries[uniqueName]) {
         leaderboardState.entries[uniqueName] = {
           name: uniqueName,
           avatar: data.avatar || "female",
-          camLoToday: 0,
-          totalCamLo: 0,
+          camLoToday: clientPoints,
+          totalCamLo: clientPoints,
           lastUpdated: Date.now(),
           isMonk: isPlayerMonk,
         };
         saveLeaderboardData();
         broadcastLeaderboard();
-      } else if (isPlayerMonk && !leaderboardState.entries[uniqueName].isMonk) {
-        leaderboardState.entries[uniqueName].isMonk = true;
-        saveLeaderboardData();
-        broadcastLeaderboard();
+      } else {
+        let changed = false;
+        const currentServerPoints = leaderboardState.entries[uniqueName].camLoToday || 0;
+        if (clientPoints > currentServerPoints) {
+          leaderboardState.entries[uniqueName].camLoToday = clientPoints;
+          leaderboardState.entries[uniqueName].totalCamLo = Math.max(leaderboardState.entries[uniqueName].totalCamLo || 0, clientPoints);
+          changed = true;
+        }
+        if (isPlayerMonk && !leaderboardState.entries[uniqueName].isMonk) {
+          leaderboardState.entries[uniqueName].isMonk = true;
+          changed = true;
+        }
+        if (changed) {
+          saveLeaderboardData();
+          broadcastLeaderboard();
+        }
       }
     }
 

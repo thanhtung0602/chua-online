@@ -73,7 +73,7 @@ export class NetworkService {
   public latestLeaderboard: LeaderboardPayload;
   public roomCount: { current: number; max?: number } = { current: 1 };
   public occupiedSeats: Map<string, { playerName: string; socketId: string }> = new Map();
-  private pendingJoin?: { name: string; avatar: string; gx: number; gy: number; isMonk?: boolean; isLoggedIn?: boolean };
+  private pendingJoin?: { name: string; avatar: string; gx: number; gy: number; isMonk?: boolean; isLoggedIn?: boolean; camLoToday?: number };
 
   private onPlayerJoinedCb?: (player: RemotePlayer) => void;
   private onPlayerMovedCb?: (data: { id: string; gx: number; gy: number; action: string; dir: "left" | "right" }) => void;
@@ -271,8 +271,8 @@ export class NetworkService {
     }
   }
 
-  public joinWorld(name: string, avatar: string, gx: number, gy: number, isMonk?: boolean, isLoggedIn?: boolean) {
-    this.pendingJoin = { name, avatar, gx, gy, isMonk, isLoggedIn };
+  public joinWorld(name: string, avatar: string, gx: number, gy: number, isMonk?: boolean, isLoggedIn?: boolean, camLoToday?: number) {
+    this.pendingJoin = { name, avatar, gx, gy, isMonk, isLoggedIn, camLoToday };
     if (this.socket && this.isConnected) {
       this.socket.emit("player:join", this.pendingJoin);
     }

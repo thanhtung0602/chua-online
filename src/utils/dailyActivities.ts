@@ -38,28 +38,69 @@ export function getVietnamDateString(): string {
 export function getSavedMeritPoints(playerName: string): number {
   const today = getVietnamDateString();
   const clean = (playerName || "").trim();
-  if (!clean) return 0;
-  const key = `chua_an_lac_merit_${today}_${clean}`;
+  let maxPoints = 0;
+
+  if (clean) {
+    const key = `chua_an_lac_merit_${today}_${clean}`;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw !== null) {
+        const val = parseInt(raw, 10);
+        if (!isNaN(val)) maxPoints = Math.max(maxPoints, val);
+      }
+    } catch {}
+  }
+
+  // Nếu là người dùng đã đăng nhập Google, kiểm tra thêm theo UID và tên Google đã lưu
   try {
-    const raw = localStorage.getItem(key);
-    if (raw !== null) {
-      const val = parseInt(raw, 10);
-      if (!isNaN(val)) return val;
+    const authRaw = localStorage.getItem("chua_an_lac_auth_user");
+    if (authRaw) {
+      const authUser = JSON.parse(authRaw);
+      if (authUser && authUser.id) {
+        const uidKey = `chua_an_lac_merit_${today}_uid_${authUser.id}`;
+        const uidRaw = localStorage.getItem(uidKey);
+        if (uidRaw !== null) {
+          const val = parseInt(uidRaw, 10);
+          if (!isNaN(val)) maxPoints = Math.max(maxPoints, val);
+        }
+      }
+      if (authUser && authUser.name && authUser.name.trim() !== clean) {
+        const nameKey = `chua_an_lac_merit_${today}_${authUser.name.trim()}`;
+        const nameRaw = localStorage.getItem(nameKey);
+        if (nameRaw !== null) {
+          const val = parseInt(nameRaw, 10);
+          if (!isNaN(val)) maxPoints = Math.max(maxPoints, val);
+        }
+      }
     }
   } catch {}
-  return 0;
+
+  return maxPoints;
 }
 
 export function saveMeritPoints(playerName: string, points: number) {
   const today = getVietnamDateString();
   const clean = (playerName || "").trim();
-  if (!clean) return;
-  const key = `chua_an_lac_merit_${today}_${clean}`;
-  try {
-    localStorage.setItem(key, points.toString());
-  } catch (e) {
-    console.warn("Không thể lưu điểm công đức vào localStorage:", e);
+  if (clean) {
+    const key = `chua_an_lac_merit_${today}_${clean}`;
+    try {
+      localStorage.setItem(key, points.toString());
+    } catch (e) {
+      console.warn("Không thể lưu điểm công đức vào localStorage:", e);
+    }
   }
+
+  // Nếu là người dùng đã đăng nhập, luôn lưu đồng thời theo UID để bảo vệ tuyệt đối dữ liệu
+  try {
+    const authRaw = localStorage.getItem("chua_an_lac_auth_user");
+    if (authRaw) {
+      const authUser = JSON.parse(authRaw);
+      if (authUser && authUser.id) {
+        const uidKey = `chua_an_lac_merit_${today}_uid_${authUser.id}`;
+        localStorage.setItem(uidKey, points.toString());
+      }
+    }
+  } catch {}
 }
 
 export class DailyActivityManager {

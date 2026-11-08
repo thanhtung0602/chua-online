@@ -301,6 +301,13 @@ class AuthService {
     return this.currentUser;
   }
 
+  public updateUser(updates: Partial<UserAccount>) {
+    if (this.currentUser) {
+      Object.assign(this.currentUser, updates);
+      this.saveToStorage();
+    }
+  }
+
   /**
    * Đăng xuất
    */
