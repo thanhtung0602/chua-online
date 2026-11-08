@@ -67,6 +67,7 @@ class ChuaAnLacGame {
   private isDragging = false;
   private pointerStartX = 0;
   private pointerStartY = 0;
+  private lastPointerX = 0;
   private lastPointerY = 0;
   private pinchStartDist = 0;
 
@@ -267,6 +268,7 @@ class ChuaAnLacGame {
       this.isDragging = false;
       this.pointerStartX = e.clientX;
       this.pointerStartY = e.clientY;
+      this.lastPointerX = e.clientX;
       this.lastPointerY = e.clientY;
     });
 
@@ -274,6 +276,7 @@ class ChuaAnLacGame {
     window.addEventListener("pointermove", (e) => {
       if (!this.isPointerDown || e.pointerId !== this.activeCameraPointerId) return;
 
+      const deltaX = e.clientX - this.lastPointerX;
       const deltaY = e.clientY - this.lastPointerY;
 
       const totalMoved = Math.hypot(e.clientX - this.pointerStartX, e.clientY - this.pointerStartY);
@@ -282,14 +285,16 @@ class ChuaAnLacGame {
       }
 
       if (this.isDragging) {
-        // Camera cố định tự động quay theo hướng đi của nhân vật; cho phép kéo nhẹ góc nâng (pitch)
+        // Giảm tốc độ quay khi người chơi chủ động kéo chuột / vuốt màn hình
+        this.cameraYaw -= deltaX * 0.0022;
         this.targetPitch = THREE.MathUtils.clamp(
-          this.targetPitch + deltaY * 0.0035,
+          this.targetPitch + deltaY * 0.0022,
           0.20,
           0.85
         );
       }
 
+      this.lastPointerX = e.clientX;
       this.lastPointerY = e.clientY;
     });
 
@@ -589,7 +594,7 @@ class ChuaAnLacGame {
   }
 
   public resetCameraBehindPlayer() {
-    this.targetYaw = this.player.facingAngle - Math.PI;
+    this.targetYaw = this.player.group.rotation.y - Math.PI;
     this.cameraYaw = this.targetYaw;
     this.targetPitch = 0.52;
     this.targetDistance = 13.5;
@@ -1456,7 +1461,7 @@ class ChuaAnLacGame {
     this.player.update(dt);
 
     // 3. Cập nhật vị trí & góc nhìn Camera Orbit
-    this.updateOrbitCamera();
+    this.updateOrbitCamera(dt);
 
     // 4. Cập nhật chu kỳ Ngày/Đêm & Đom đóm
     this.dayNight.update(dt, elapsed);
@@ -1572,21 +1577,27 @@ class ChuaAnLacGame {
     this.player.moveByDirectionVector(moveVector, dt);
   }
 
-  private updateOrbitCamera() {
-    // Camera cố định tự động quay mượt mà theo hướng đi / hướng nhìn của nhân vật
-    this.targetYaw = this.player.facingAngle - Math.PI;
+  private updateOrbitCamera(dt: number = 0.016) {
+    // Nếu người chơi đang chủ động kéo chuột xoay camera thì không tự động giật lại
+    if (!this.isDragging) {
+      // Camera tự động quay mượt mà theo hướng xoay thực tế của nhân vật
+      const playerHeading = this.player.group.rotation.y;
+      this.targetYaw = playerHeading - Math.PI;
 
-    // Tính khoảng cách góc ngắn nhất theo cung tròn (tránh xoay vòng 360 độ khi qua mốc PI)
-    let angleDiff = (this.targetYaw - this.cameraYaw) % (Math.PI * 2);
-    if (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-    if (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      // Tính khoảng cách góc ngắn nhất theo cung tròn (tránh xoay vòng 360 độ khi qua mốc PI)
+      let angleDiff = (this.targetYaw - this.cameraYaw) % (Math.PI * 2);
+      if (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      if (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
 
-    // Tốc độ bám theo êm ái, chậm rãi, đồng bộ với hướng quay của nhân vật (không chóng mặt)
-    const followSpeed = this.player.isMoving ? 0.042 : 0.025;
-    this.cameraYaw += angleDiff * followSpeed;
+      // Giảm tốc độ quay của camera: xoay chậm rãi, êm dịu, không giật lắc và đồng bộ với nhân vật
+      const followRate = this.player.isMoving
+        ? Math.min(1.0, dt * 1.5)
+        : Math.min(1.0, dt * 0.8);
+      this.cameraYaw += angleDiff * followRate;
+    }
 
-    this.cameraPitch = THREE.MathUtils.lerp(this.cameraPitch, this.targetPitch, 0.05);
-    this.cameraDistance = THREE.MathUtils.lerp(this.cameraDistance, this.targetDistance, 0.05);
+    this.cameraPitch = THREE.MathUtils.lerp(this.cameraPitch, this.targetPitch, Math.min(1.0, dt * 3.0));
+    this.cameraDistance = THREE.MathUtils.lerp(this.cameraDistance, this.targetDistance, Math.min(1.0, dt * 3.0));
 
     const playerPos = this.player.getPosition();
     const lookTarget = new THREE.Vector3(playerPos.x, playerPos.y + 1.15, playerPos.z);

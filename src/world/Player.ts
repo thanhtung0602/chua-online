@@ -1057,14 +1057,14 @@ export class Player {
       }
     }
 
-    // Xoay nhân vật mượt mà, chậm rãi và đồng bộ êm ái với camera
+    // Giảm tốc độ quay hướng của nhân vật: chậm rãi, từ tốn, uyển chuyển chốn thiền môn
     let rotDiff = (this.facingAngle - this.group.rotation.y) % (Math.PI * 2);
     if (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
     if (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
 
     const turnRate = this.isMoving
-      ? Math.min(1.0, dt * 4.2)
-      : Math.min(1.0, dt * 2.8);
+      ? Math.min(1.0, dt * 2.0)
+      : Math.min(1.0, dt * 1.4);
     this.group.rotation.y += rotDiff * turnRate;
 
     // Cập nhật cao độ mặt đất mượt mà (tránh giật cục khi bước lên bậc tam cấp hoặc sàn chính điện)
