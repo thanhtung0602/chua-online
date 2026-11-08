@@ -67,7 +67,6 @@ class ChuaAnLacGame {
   private isDragging = false;
   private pointerStartX = 0;
   private pointerStartY = 0;
-  private lastPointerX = 0;
   private lastPointerY = 0;
   private pinchStartDist = 0;
 
@@ -259,7 +258,6 @@ class ChuaAnLacGame {
       this.isDragging = false;
       this.pointerStartX = e.clientX;
       this.pointerStartY = e.clientY;
-      this.lastPointerX = e.clientX;
       this.lastPointerY = e.clientY;
     });
 
@@ -267,7 +265,6 @@ class ChuaAnLacGame {
     window.addEventListener("pointermove", (e) => {
       if (!this.isPointerDown || e.pointerId !== this.activeCameraPointerId) return;
 
-      const deltaX = e.clientX - this.lastPointerX;
       const deltaY = e.clientY - this.lastPointerY;
 
       const totalMoved = Math.hypot(e.clientX - this.pointerStartX, e.clientY - this.pointerStartY);
@@ -276,15 +273,14 @@ class ChuaAnLacGame {
       }
 
       if (this.isDragging) {
-        this.targetYaw -= deltaX * 0.0055;
+        // Camera cố định tự động quay theo hướng đi của nhân vật; cho phép kéo nhẹ góc nâng (pitch)
         this.targetPitch = THREE.MathUtils.clamp(
-          this.targetPitch + deltaY * 0.0045,
-          0.16,
-          1.32
+          this.targetPitch + deltaY * 0.0035,
+          0.20,
+          0.85
         );
       }
 
-      this.lastPointerX = e.clientX;
       this.lastPointerY = e.clientY;
     });
 
@@ -573,7 +569,8 @@ class ChuaAnLacGame {
   }
 
   public resetCameraBehindPlayer() {
-    this.targetYaw = this.player.facingAngle;
+    this.targetYaw = this.player.facingAngle - Math.PI;
+    this.cameraYaw = this.targetYaw;
     this.targetPitch = 0.52;
     this.targetDistance = 13.5;
   }
@@ -602,31 +599,36 @@ class ChuaAnLacGame {
           // Bước vào chính điện đại thụ: đứng trang nghiêm trên đại lộ trung tâm trước Tam Thế Phật
           this.player.teleportTo(0, -18.0, 0.65, Math.PI);
           this.player.setAction("pray");
+          this.cameraYaw = 0;
           this.targetYaw = 0;
           this.targetDistance = 11.0;
           this.targetPitch = 0.35;
           zenAudio.playSingingBowl(528);
           this.speechBubbles.show(this.player.group, "A Di Đà Phật! Chiêm bái Tam Thế Phật trong Đại Hùng Bảo Điện 🙏");
         } else if (location === "courtyard") {
-          this.player.teleportTo(0, 10, 0, 0);
+          this.player.teleportTo(0, 10, 0, Math.PI);
+          this.cameraYaw = 0;
           this.targetYaw = 0;
           this.targetDistance = 13.5;
         } else if (location === "gate") {
           // Đến trước Cổng Tam Quan, hướng nhìn vào chùa
-          this.player.teleportTo(0, 28.5, 0, 0);
+          this.player.teleportTo(0, 28.5, 0, Math.PI);
+          this.cameraYaw = 0;
           this.targetYaw = 0;
           this.targetDistance = 12.0;
           this.targetPitch = 0.32;
           zenAudio.playSingingBowl(528);
           this.speechBubbles.show(this.player.group, "A Di Đà Phật! Quang lâm Cổng Tam Quan Chùa An Lạc 🙏");
         } else if (location === "pond") {
-          this.player.teleportTo(0, 1, 0.22, 0);
+          this.player.teleportTo(0, 1, 0.22, Math.PI);
+          this.cameraYaw = 0;
           this.targetYaw = 0;
           this.targetDistance = 11;
         } else if (location === "garden") {
           // Đến trước lối vào Vườn An Lạc & Chú Tiểu Tịnh Tâm (gần Cổng Tam Quan, trước Hồ Sen)
           this.player.teleportTo(4.8, 15.5, 0, Math.PI / 2);
-          this.targetYaw = Math.PI / 2;
+          this.cameraYaw = -Math.PI / 2;
+          this.targetYaw = -Math.PI / 2;
           this.targetDistance = 9.0;
           this.targetPitch = 0.28;
           zenAudio.playSingingBowl(528);
@@ -634,6 +636,7 @@ class ChuaAnLacGame {
         } else if (location === "bell") {
           // Đến trước bậc thềm Lầu Chuông Đại Hồng Chung & Chú Tiểu Trí Tuệ
           this.player.teleportTo(-10, -6.5, 0, Math.PI);
+          this.cameraYaw = 0;
           this.targetYaw = 0;
           this.targetDistance = 9.5;
           this.targetPitch = 0.28;
@@ -642,7 +645,8 @@ class ChuaAnLacGame {
         }
       },
       onTeleportToCoords: (x, z, y = 0, locationName) => {
-        this.player.teleportTo(x, z, y, 0);
+        this.player.teleportTo(x, z, y, Math.PI);
+        this.cameraYaw = 0;
         this.targetYaw = 0;
         this.targetDistance = 9.5;
         this.targetPitch = 0.28;
@@ -1497,7 +1501,17 @@ class ChuaAnLacGame {
   }
 
   private updateOrbitCamera() {
-    this.cameraYaw = THREE.MathUtils.lerp(this.cameraYaw, this.targetYaw, 0.12);
+    // Camera cố định tự động quay mượt mà theo hướng đi / hướng nhìn của nhân vật
+    this.targetYaw = this.player.facingAngle - Math.PI;
+
+    // Tính khoảng cách góc ngắn nhất theo cung tròn (tránh xoay vòng 360 độ khi qua mốc PI)
+    let angleDiff = (this.targetYaw - this.cameraYaw) % (Math.PI * 2);
+    if (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+    if (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+
+    const followSpeed = this.player.isMoving ? 0.09 : 0.06;
+    this.cameraYaw += angleDiff * followSpeed;
+
     this.cameraPitch = THREE.MathUtils.lerp(this.cameraPitch, this.targetPitch, 0.12);
     this.cameraDistance = THREE.MathUtils.lerp(this.cameraDistance, this.targetDistance, 0.12);
 

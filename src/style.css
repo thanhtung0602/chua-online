@@ -979,8 +979,22 @@ body.modal-open .teleport-dropdown-panel {
   }
 }
 
+/* Hiển thị văn bản linh hoạt giữa PC và Mobile */
+.menu-text-short {
+  display: none;
+}
+.menu-text-long {
+  display: inline;
+}
+.title-online {
+  display: inline;
+}
+.title-chua {
+  display: inline;
+}
+
 @media (max-width: 768px), (max-height: 550px) {
-  /* TOP NAV GỌN GÀNG TRÊN MOBILE / THU NHỎ MÀN HÌNH - KHÔNG CHE TẦM NHÌN, TƯƠNG THÍCH TAI THỎ / DYNAMIC ISLAND */
+  /* TOP NAV GỌN GÀNG TRÊN MOBILE - HIỂN THỊ ĐẦY ĐỦ 100% CÁC NÚT VÀ CHỨC NĂNG, KHÔNG BỊ CẮT */
   .top-nav-bar {
     top: max(4px, env(safe-area-inset-top));
     left: max(4px, env(safe-area-inset-left));
@@ -988,38 +1002,65 @@ body.modal-open .teleport-dropdown-panel {
     gap: 3px;
   }
 
-  .top-nav {
-    padding: 2px 6px;
-    border-radius: 10px;
-    gap: 4px;
-    min-height: 32px;
-    height: 32px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    max-width: 100%;
+  .title-online {
+    display: none !important;
   }
 
-  .top-nav::-webkit-scrollbar {
-    display: none;
+  .menu-text-long {
+    display: none !important;
+  }
+
+  .menu-text-short {
+    display: inline !important;
+  }
+
+  .top-nav {
+    padding: 3px 6px;
+    border-radius: 10px;
+    gap: 3px;
+    min-height: 28px;
+    height: 28px;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    overflow-y: hidden;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .brand-wrap {
+    gap: 4px;
+    flex-shrink: 0;
+    align-items: center;
   }
 
   .brand {
-    gap: 4px;
+    gap: 3px;
     flex-shrink: 0;
+    align-items: center;
   }
 
   .temple-icon {
-    font-size: 15px;
+    font-size: 14px;
   }
 
   .temple-title {
-    font-size: 11px;
+    font-size: 10.5px;
     white-space: nowrap;
+    letter-spacing: 0;
   }
 
   .temple-subtitle {
     display: none !important;
+  }
+
+  .teleport-menu-trigger {
+    padding: 1px 5px;
+    font-size: 10px;
+    border-radius: 6px;
+    gap: 2px;
+    height: 22px;
   }
 
   /* Ẩn FPS trên điện thoại để tiết kiệm diện tích */
@@ -1036,7 +1077,7 @@ body.modal-open .teleport-dropdown-panel {
   }
 
   .user-stats {
-    gap: 2px;
+    gap: 3px;
     flex-shrink: 0;
     align-items: center;
   }
@@ -1045,31 +1086,64 @@ body.modal-open .teleport-dropdown-panel {
     padding: 1px 5px;
     font-size: 10px;
     height: 22px;
+    border-radius: 6px;
     flex-shrink: 0;
   }
 
   .auth-badge {
-    max-width: 85px;
+    max-width: 82px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     padding: 1px 5px;
-    font-size: 10px;
+    font-size: 9.5px;
+    height: 22px;
+    border-radius: 6px;
+    flex-shrink: 0;
   }
 
   .auth-badge b {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 60px;
+    max-width: 62px;
     display: inline-block;
     vertical-align: middle;
+    font-size: 9.5px;
+    line-height: 1.1;
+  }
+
+  #btn-camlo-badge {
+    display: flex !important;
+    padding: 1px 5px;
+    font-size: 10px;
+    height: 22px;
+    border-radius: 6px;
+    flex-shrink: 0;
   }
 
   .icon-btn {
-    width: 26px;
-    height: 26px;
-    font-size: 12px;
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  #btn-music-menu {
+    display: none !important;
+  }
+
+  .music-player-wrap {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .music-toggle-btn {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+    flex-shrink: 0;
   }
 
   .time-picker {
@@ -1084,15 +1158,15 @@ body.modal-open .teleport-dropdown-panel {
 
   /* MENU VIẾNG CẢNH CHÙA TRÊN MOBILE: THU GỌN VÀ HIỂN THỊ ĐẸP MẮT */
   .brand-wrap {
-    gap: 5px;
+    gap: 3px;
   }
 
   .teleport-menu-trigger {
-    padding: 2px 6px;
-    font-size: 10.5px;
-    border-radius: 10px;
-    gap: 3px;
-    height: 24px;
+    padding: 1px 5px;
+    font-size: 10px;
+    border-radius: 6px;
+    gap: 2px;
+    height: 22px;
   }
 
   .teleport-dropdown-panel {
@@ -1240,11 +1314,35 @@ body.modal-open .teleport-dropdown-panel {
     display: none;
   }
   .temple-title {
-    font-size: 12px;
+    font-size: 10.5px;
+    letter-spacing: 0;
   }
   .floating-chat-pill {
     padding: 5px 10px;
     font-size: 11px;
+  }
+}
+
+@media (max-width: 380px) {
+  .title-chua {
+    display: none !important;
+  }
+  .temple-title {
+    font-size: 9.5px !important;
+  }
+  .teleport-menu-trigger {
+    padding: 1px 4px !important;
+    gap: 1px !important;
+  }
+  .teleport-menu-trigger .menu-arrow {
+    display: none !important;
+  }
+  .auth-badge {
+    max-width: 68px !important;
+    padding: 1px 4px !important;
+  }
+  .auth-badge b {
+    max-width: 48px !important;
   }
 }
 

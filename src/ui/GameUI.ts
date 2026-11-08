@@ -144,7 +144,7 @@ export class GameUI {
             <div class="brand">
               <span class="temple-icon">🛕</span>
               <div class="brand-text">
-                <h1 class="temple-title">CHÙA AN LẠC ONLINE</h1>
+                <h1 class="temple-title"><span class="title-chua">CHÙA </span>AN LẠC <span class="title-online">ONLINE</span></h1>
                 <span class="temple-subtitle">Digital Zen Sanctuary</span>
               </div>
             </div>
@@ -153,7 +153,7 @@ export class GameUI {
             <div class="teleport-menu-wrapper" id="teleport-menu-wrapper">
               <button type="button" class="teleport-menu-trigger clickable-badge" id="btn-teleport-menu-toggle" title="Mở Danh Mục Địa Điểm & Tiện Ích">
                 <span class="menu-icon">🧭</span>
-                <b class="menu-label-text">Danh Mục</b>
+                <b class="menu-label-text"><span class="menu-text-long">Danh Mục</span><span class="menu-text-short">Menu</span></b>
                 <span class="menu-arrow" id="teleport-menu-arrow">▾</span>
               </button>
 
