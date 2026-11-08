@@ -124,53 +124,10 @@ html {
   display: block;
 }
 
-/* LỜI DẠY PHẬT PHÁP & CHÂM NGÔN THIỀN AN LẠC (HIỂN THỊ TRỌN VẸN 100% CHỮ) */
-.quote-banner {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  align-self: center;
-  gap: 10px;
-  font-size: 13.5px;
-  font-style: italic;
-  font-weight: 500;
-  line-height: 1.5;
-  color: #fff9e6;
-  background: rgba(20, 28, 22, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(212, 175, 55, 0.38);
-  padding: 6px 22px;
-  border-radius: 20px;
-  max-width: min(980px, calc(100vw - 32px));
-  width: fit-content;
-  text-align: center;
-  white-space: normal; /* Không bao giờ cắt ngang chữ, hiển thị trọn vẹn 100% toàn bộ câu */
-  word-break: break-word;
-  cursor: pointer;
-  user-select: none;
-  transition: all 0.25s ease, opacity 0.2s ease, transform 0.2s ease;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-  pointer-events: auto;
-  box-sizing: border-box;
-  z-index: 10;
-  position: relative;
-}
-
-.quote-banner:hover {
-  background: rgba(26, 36, 28, 0.95);
-  border-color: #ffd700;
-  box-shadow: 0 0 16px rgba(255, 215, 0, 0.35);
-  transform: translateY(-1px);
-}
-
-/* KHI MENU ĐANG MỞ: ẨN LỜI PHẬT DẠY ĐỂ MENU KHÔNG BAO GIỜ BỊ CHE HOẶC RỐI MẮT */
-.top-nav-bar.menu-open .quote-banner,
-.quote-banner.menu-open {
-  opacity: 0 !important;
-  pointer-events: none !important;
-  transform: translateY(-4px) !important;
-  visibility: hidden !important;
+/* LỜI DẠY PHẬT PHÁP (ĐÃ GỠ BỎ HOÀN TOÀN THEO YÊU CẦU) */
+.quote-banner,
+#quote-banner {
+  display: none !important;
 }
 
 #daily-quote {
@@ -1178,33 +1135,70 @@ body.modal-open .teleport-dropdown-panel {
   }
 
   .teleport-dropdown-panel {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    right: 0;
-    width: 100%;
-    min-width: unset;
-    max-width: 100%;
-    box-sizing: border-box;
-    max-height: calc(100vh - 65px);
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    z-index: 99999;
-    padding: 10px 8px;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.9), 0 0 20px rgba(212, 175, 55, 0.35);
+    position: fixed !important;
+    top: max(44px, calc(env(safe-area-inset-top) + 36px)) !important;
+    left: max(8px, env(safe-area-inset-left)) !important;
+    right: max(8px, env(safe-area-inset-right)) !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 440px !important;
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
+    max-height: calc(100dvh - max(52px, calc(env(safe-area-inset-top) + 44px))) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    z-index: 99999 !important;
+    padding: 10px 10px 12px !important;
+    border-radius: 16px !important;
+    background: rgba(13, 20, 15, 0.98) !important;
+    border: 1.5px solid rgba(212, 175, 55, 0.6) !important;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.95), 0 0 24px rgba(212, 175, 55, 0.35) !important;
+    transform: none !important;
+    animation: teleport-panel-slide-mobile 0.2s ease-out !important;
+  }
+
+  .teleport-dropdown-panel.hidden {
+    display: none !important;
+  }
+
+  .teleport-dropdown-header {
+    padding-bottom: 8px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .teleport-dropdown-title {
+    font-size: 11.5px !important;
   }
 
   .teleport-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .teleport-grid .nav-btn {
-    font-size: 11px;
-    padding: 7px 8px;
-    touch-action: manipulation;
-    white-space: normal;
-    text-align: left;
+    width: 100% !important;
+    font-size: 11px !important;
+    padding: 8px 6px !important;
+    border-radius: 10px !important;
+    min-height: 38px !important;
+    display: flex !important;
+    align-items: center !important;
+    white-space: normal !important;
+    line-height: 1.25 !important;
+    box-sizing: border-box !important;
+    touch-action: manipulation !important;
+    letter-spacing: 0 !important;
+  }
+
+  /* Nút thứ 9: Nhiệm Vụ Công Quả trải rộng 2 cột để menu vuông vức, cân đối */
+  .teleport-grid #btn-open-quests {
+    grid-column: span 2 !important;
+    justify-content: center !important;
+    text-align: center !important;
+    font-weight: 700 !important;
   }
 
   /* CHAT CONTAINER TRÊN MOBILE: NẰM GỌN GÀNG */
@@ -1280,26 +1274,6 @@ body.modal-open .teleport-dropdown-panel {
   .action-btn .btn-label {
     font-size: 8px;
     white-space: nowrap;
-  }
-}
-
-/* KHI XOAY NGANG MÀN HÌNH ĐIỆN THOẠI (LANDSCAPE - MAX HEIGHT 550PX):
-   ẨN HOÀN TOÀN THANH LỜI PHẬT DẠY ĐỂ GIẢI PHÓNG TOÀN BỘ KHÔNG GIAN 3D! */
-@media (max-height: 550px) {
-  .quote-banner {
-    display: none !important;
-  }
-}
-
-/* KHI Ở MÀN HÌNH DỌC (PORTRAIT): THU GỌN THANH LỜI PHẬT DẠY SIÊU MẢNH */
-@media (max-width: 768px) and (min-height: 551px) {
-  .quote-banner {
-    font-size: 10.5px;
-    padding: 3px 10px;
-    line-height: 1.3;
-    border-radius: 12px;
-    gap: 4px;
-    max-width: 98%;
   }
 }
 
@@ -1568,6 +1542,17 @@ body.modal-open .teleport-dropdown-panel {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes teleport-panel-slide-mobile {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -5307,6 +5292,75 @@ body.chanting-mode-active .camera-helper-hint {
 
 .game-update-banner .update-dismiss-btn:hover {
   color: #fff;
+}
+
+/* ==========================================================================
+   TỐI ƯU HÓA MENU DANH MỤC TIỆN ÍCH TRÊN THIẾT BỊ DI ĐỘNG (MOBILE VIEWPORT)
+   Đảm bảo bảng Menu luôn căn giữa hoàn hảo, không bao giờ bị lệch sang phải
+   ========================================================================== */
+@media (max-width: 768px), (max-height: 550px) {
+  .brand-wrap {
+    gap: 3px !important;
+  }
+
+  .teleport-menu-wrapper {
+    position: static !important;
+  }
+
+  .teleport-dropdown-panel {
+    position: fixed !important;
+    top: max(44px, calc(env(safe-area-inset-top) + 36px)) !important;
+    left: max(8px, env(safe-area-inset-left)) !important;
+    right: max(8px, env(safe-area-inset-right)) !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 440px !important;
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
+    max-height: calc(100dvh - max(52px, calc(env(safe-area-inset-top) + 44px))) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    z-index: 99999 !important;
+    padding: 10px 10px 12px !important;
+    border-radius: 16px !important;
+    background: rgba(13, 20, 15, 0.98) !important;
+    border: 1.5px solid rgba(212, 175, 55, 0.6) !important;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.95), 0 0 24px rgba(212, 175, 55, 0.35) !important;
+    transform: none !important;
+    animation: teleport-panel-slide-mobile 0.2s ease-out !important;
+  }
+
+  .teleport-dropdown-panel.hidden {
+    display: none !important;
+  }
+
+  .teleport-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+
+  .teleport-grid .nav-btn {
+    width: 100% !important;
+    font-size: 11px !important;
+    padding: 8px 6px !important;
+    border-radius: 10px !important;
+    min-height: 38px !important;
+    display: flex !important;
+    align-items: center !important;
+    white-space: normal !important;
+    line-height: 1.25 !important;
+    box-sizing: border-box !important;
+    touch-action: manipulation !important;
+  }
+
+  .teleport-grid #btn-open-quests {
+    grid-column: span 2 !important;
+    justify-content: center !important;
+    text-align: center !important;
+    font-weight: 700 !important;
+  }
 }
 
 

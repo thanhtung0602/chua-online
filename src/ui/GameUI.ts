@@ -16,7 +16,6 @@ import {
   getSavedMeritPoints,
   saveMeritPoints,
 } from "../utils/dailyActivities";
-import { ZenQuoteManager } from "../utils/zenQuotes";
 import {
   network,
   type LeaderboardPayload,
@@ -90,7 +89,6 @@ export class GameUI {
   private selectedOracleCategory: OracleCategory = "love";
   private currentOracleStick: OracleStick | null = null;
   private isShakingOracle: boolean = false;
-  private quoteManager!: ZenQuoteManager;
   public playerName: string = authService.isLoggedIn()
     ? (authService.getDharmaName() || authService.getCurrentUser()?.name || "Đạo Hữu")
     : "Đạo Hữu An Nhiên";
@@ -236,13 +234,6 @@ export class GameUI {
               </div>
             </div>
           </div>
-        </div>
-
-        <!-- LỜI DẠY PHẬT PHÁP & CHÂM NGÔN THIỀN AN LẠC (HIỂN THỊ TRỌN VẸN 100% CHỮ) -->
-        <div class="quote-banner" id="quote-banner" title="Nhấp để chuyển sang Lời Phật Dạy & Châm Ngôn Thiền tiếp theo">
-          <span class="quote-icon">🌸</span>
-          <span id="daily-quote">"Tâm an vạn sự an. Bình yên đến từ bên trong, đừng tìm kiếm ở bên ngoài."</span>
-          <span class="quote-icon">🌸</span>
         </div>
       </header>
 
@@ -1118,15 +1109,7 @@ export class GameUI {
   }
 
   private bindEvents() {
-    // 0. Luân chuyển tự động Lời Dạy Phật Pháp & Châm Ngôn Thiền Định (mỗi 12 giây đổi câu 1 lần)
-    this.quoteManager = new ZenQuoteManager("daily-quote", 12000);
-    const quoteBanner = document.getElementById("quote-banner");
-    quoteBanner?.addEventListener("click", () => {
-      this.quoteManager.nextQuote();
-      zenAudio.playLotusSound();
-    });
-
-    // Tự động theo dõi trạng thái mở modal: gán class 'modal-open' lên body để ẩn trọn vẹn top-nav-bar & quote-banner
+    // Tự động theo dõi trạng thái mở modal: gán class 'modal-open' lên body để ẩn trọn vẹn top-nav-bar
     const syncModalState = () => {
       const openModal = this.container.querySelector(".modal-backdrop:not(.hidden):not(.chanting-backdrop)");
       if (openModal) {
@@ -3383,12 +3366,10 @@ export class GameUI {
     const trigger = document.getElementById("btn-teleport-menu-toggle");
     const arrow = document.getElementById("teleport-menu-arrow");
     const navBar = document.getElementById("top-nav-bar");
-    const quoteBanner = document.getElementById("quote-banner");
     if (panel) panel.classList.remove("hidden");
     if (trigger) trigger.classList.add("active");
     if (arrow) arrow.innerText = "▴";
     if (navBar) navBar.classList.add("menu-open");
-    if (quoteBanner) quoteBanner.classList.add("menu-open");
   }
 
   public closeTeleportMenu() {
@@ -3396,12 +3377,10 @@ export class GameUI {
     const trigger = document.getElementById("btn-teleport-menu-toggle");
     const arrow = document.getElementById("teleport-menu-arrow");
     const navBar = document.getElementById("top-nav-bar");
-    const quoteBanner = document.getElementById("quote-banner");
     if (panel) panel.classList.add("hidden");
     if (trigger) trigger.classList.remove("active");
     if (arrow) arrow.innerText = "▾";
     if (navBar) navBar.classList.remove("menu-open");
-    if (quoteBanner) quoteBanner.classList.remove("menu-open");
   }
 
   // ─────────────────────────────────────────────
