@@ -485,19 +485,29 @@ function saveLeaderboardData() {
 
   // Đồng bộ đám mây MongoDB Atlas
   if (isMongoConnected) {
-    LeaderboardModel.updateOne(
-      { docId: "active_leaderboard" },
-      {
-        $set: {
+    LeaderboardModel.findOne({ docId: "active_leaderboard" }).then(async (doc) => {
+      if (doc) {
+        doc.currentDate = leaderboardState.currentDate;
+        doc.currentAbbot = leaderboardState.currentAbbot;
+        doc.seniorMonks = leaderboardState.seniorMonks;
+        doc.entries = leaderboardState.entries;
+        doc.history = leaderboardState.history;
+        doc.markModified("entries");
+        doc.markModified("currentAbbot");
+        doc.markModified("seniorMonks");
+        doc.markModified("history");
+        await doc.save();
+      } else {
+        await LeaderboardModel.create({
+          docId: "active_leaderboard",
           currentDate: leaderboardState.currentDate,
           currentAbbot: leaderboardState.currentAbbot,
           seniorMonks: leaderboardState.seniorMonks,
           entries: leaderboardState.entries,
           history: leaderboardState.history,
-        },
-      },
-      { upsert: true }
-    ).catch((e) => console.warn("⚠️ [MongoDB] Lỗi lưu Leaderboard:", e.message));
+        });
+      }
+    }).catch((e) => console.warn("⚠️ [MongoDB] Lỗi lưu Leaderboard:", e.message));
   }
 }
 
@@ -581,6 +591,7 @@ async function cleanupMongoDuplicateSuffixEntries() {
                 totalCamLo: dup.totalCamLo || 0,
                 totalDonated: dup.totalDonated || 0,
                 donationCount: dup.donationCount || 0,
+                questsCompletedToday: (dup as any).questsCompletedToday || 0,
               },
             },
             { upsert: true }
@@ -595,6 +606,35 @@ async function cleanupMongoDuplicateSuffixEntries() {
       for (const ord of dupOrders) {
         ord.playerName = ord.playerName.replace(/\s*#\d+$/, "").trim();
         await ord.save();
+      }
+    }
+
+    // Làm sạch và gộp triệt để tài liệu active_leaderboard trên Cloud
+    const activeDoc = await LeaderboardModel.findOne({ docId: "active_leaderboard" });
+    if (activeDoc && activeDoc.entries && typeof activeDoc.entries === "object") {
+      let docChanged = false;
+      const docEntries = activeDoc.entries as any;
+      for (const k of Object.keys(docEntries)) {
+        if (/#\d+$/.test(k)) {
+          const base = k.replace(/\s*#\d+$/, "").trim();
+          if (base) {
+            if (!docEntries[base]) {
+              docEntries[base] = { ...docEntries[k], name: base };
+            } else {
+              docEntries[base].camLoToday = Math.max(docEntries[base].camLoToday || 0, docEntries[k].camLoToday || 0);
+              docEntries[base].totalCamLo = Math.max(docEntries[base].totalCamLo || 0, docEntries[k].totalCamLo || 0);
+              docEntries[base].totalDonated = Math.max(docEntries[base].totalDonated || 0, docEntries[k].totalDonated || 0);
+              docEntries[base].donationCount = Math.max(docEntries[base].donationCount || 0, docEntries[k].donationCount || 0);
+            }
+          }
+          delete docEntries[k];
+          docChanged = true;
+        }
+      }
+      if (docChanged) {
+        activeDoc.markModified("entries");
+        await activeDoc.save();
+        console.log("🧹 [MongoDB Atlas] Đã dọn dẹp và chuẩn hóa active_leaderboard trên Cloud!");
       }
     }
   } catch (err) {
@@ -770,9 +810,35 @@ function checkDailyReset(): boolean {
 // Lấy danh sách Top Bảng Xếp Hạng phân chia 2 bảng Xuất Gia & Cư Sĩ
 function getLeaderboardPayload() {
   checkDailyReset();
+  cleanupDuplicateSuffixEntries();
 
-  const allEntries = Object.values(leaderboardState.entries);
-  allEntries.sort((a, b) => b.camLoToday - a.camLoToday || b.totalCamLo - a.totalCamLo || a.lastUpdated - b.lastUpdated);
+  // Gộp tất cả các bản ghi có cùng tên gốc (loại bỏ và hợp nhất mọi hậu tố #2, #3,...)
+  const mergedMap = new Map<string, LeaderboardEntry>();
+  for (const entry of Object.values(leaderboardState.entries)) {
+    const cleanName = (entry.name || "").replace(/\s*#\d+$/, "").trim();
+    if (!cleanName) continue;
+    const key = cleanName.toLowerCase();
+    const existing = mergedMap.get(key);
+    if (!existing) {
+      mergedMap.set(key, {
+        ...entry,
+        name: cleanName,
+        isMonk: cleanName.startsWith("Thích ") || Boolean(entry.isMonk),
+      });
+    } else {
+      existing.camLoToday = Math.max(existing.camLoToday || 0, entry.camLoToday || 0);
+      existing.totalCamLo = Math.max(existing.totalCamLo || 0, entry.totalCamLo || 0);
+      existing.totalDonated = Math.max(existing.totalDonated || 0, entry.totalDonated || 0);
+      existing.donationCount = Math.max(existing.donationCount || 0, entry.donationCount || 0);
+      if (entry.isMonk || cleanName.startsWith("Thích ")) existing.isMonk = true;
+      if (entry.avatar && (!existing.avatar || existing.avatar === "chibi_gray")) {
+        existing.avatar = entry.avatar;
+      }
+    }
+  }
+
+  const allEntries = Array.from(mergedMap.values());
+  allEntries.sort((a, b) => (b.camLoToday || 0) - (a.camLoToday || 0) || (b.totalCamLo || 0) - (a.totalCamLo || 0) || (a.lastUpdated || 0) - (b.lastUpdated || 0));
 
   // 1. BẢNG XUẤT GIA (Tu sĩ đã xuống tóc - Họ Thích hoặc isMonk)
   const monasticLeaderboard = allEntries.filter(
@@ -787,7 +853,7 @@ function getLeaderboardPayload() {
   // Trụ Trì: Nếu đã có Trụ Trì chính thức từ ngày hôm trước
   let abbot = leaderboardState.currentAbbot;
   // Nếu chưa có Trụ Trì hôm qua nhưng trong bảng xuất gia có vị sư dẫn đầu hôm nay với điểm > 0
-  if (!abbot && monasticLeaderboard.length > 0 && monasticLeaderboard[0].camLoToday > 0) {
+  if (!abbot && monasticLeaderboard.length > 0 && (monasticLeaderboard[0].camLoToday || 0) > 0) {
     abbot = {
       name: monasticLeaderboard[0].name,
       avatar: monasticLeaderboard[0].avatar,
@@ -796,16 +862,22 @@ function getLeaderboardPayload() {
     };
   }
 
-  // 12 Vị Cao Tăng (Hạng 2 đến 13 trong bảng xuất gia) - CHỈ LẤY NGƯỜI CHƠI THẬT
-  const seniorMonks: SeniorMonkInfo[] = [];
-  for (let i = 1; i < Math.min(13, monasticLeaderboard.length); i++) {
-    const monk = monasticLeaderboard[i];
-    seniorMonks.push({
-      rank: i + 1,
-      name: monk.name,
-      avatar: monk.avatar,
-      camLoYesterday: monk.camLoToday,
-    });
+  // 12 Vị Cao Tăng (Hạng 2 đến 13 trong bảng xuất gia) - BẢO LƯU TỪ MIDNIGHT HOẶC TỰ ĐỘNG CẬP NHẬT
+  let seniorMonks: SeniorMonkInfo[] = [];
+  if (Array.isArray(leaderboardState.seniorMonks) && leaderboardState.seniorMonks.length > 0) {
+    seniorMonks = leaderboardState.seniorMonks;
+  } else {
+    for (let i = 1; i < Math.min(13, monasticLeaderboard.length); i++) {
+      const monk = monasticLeaderboard[i];
+      if ((monk.camLoToday || 0) > 0 || (monk.totalCamLo || 0) > 0) {
+        seniorMonks.push({
+          rank: i + 1,
+          name: monk.name,
+          avatar: monk.avatar,
+          camLoYesterday: monk.camLoToday || 0,
+        });
+      }
+    }
   }
 
   // 3. BẢNG ĐẠI THÍ CHỦ CÚNG DƯỜNG TAM BẢO (Nạp / Cúng Dường Nhiều Nhất)
@@ -866,7 +938,7 @@ const io = new Server(server, {
 // QUẢN LÝ TÍNH DUY NHẤT CỦA TÊN NGƯỜI CHƠI (KHÔNG ĐƯỢC TRÙNG NHAU)
 // ─────────────────────────────────────────────
 function isNameAlreadyTaken(name: string, excludeSocketId?: string, clientToken?: string): boolean {
-  const clean = name.trim().toLowerCase();
+  const clean = name.trim().toLowerCase().replace(/\s*#\d+$/, "");
   if (!clean) return true;
 
   // Kiểm tra với tất cả người chơi đang kết nối online trong chùa
@@ -876,7 +948,8 @@ function isNameAlreadyTaken(name: string, excludeSocketId?: string, clientToken?
       if (clientToken && p.clientToken && p.clientToken === clientToken) {
         continue;
       }
-      if (p.name.trim().toLowerCase() === clean) {
+      const pClean = (p.name || "").trim().toLowerCase().replace(/\s*#\d+$/, "");
+      if (pClean === clean) {
         return true;
       }
     }
@@ -885,27 +958,12 @@ function isNameAlreadyTaken(name: string, excludeSocketId?: string, clientToken?
   return false;
 }
 
-function getGuaranteedUniqueName(baseName: string, excludeSocketId?: string, clientToken?: string): string {
+function getGuaranteedUniqueName(baseName: string, _excludeSocketId?: string, _clientToken?: string): string {
   let candidate = (baseName || "Đạo Hữu").trim().slice(0, 30);
-  // Luôn gỡ bỏ hậu tố #... nếu có trước khi kiểm tra
+  // Luôn loại bỏ hậu tố #... để không bao giờ làm biến dạng tên nhân vật thành #2, #3
   candidate = candidate.replace(/\s*#\d+$/, "").trim();
   if (!candidate) candidate = "Đạo Hữu";
-
-  if (!isNameAlreadyTaken(candidate, excludeSocketId, clientToken)) {
-    return candidate;
-  }
-
-  // Thêm hậu tố số tăng dần nếu thực sự đang có một người chơi KHÁC online trùng tên
-  let count = 2;
-  while (count <= 99) {
-    const test = `${candidate} #${count}`.slice(0, 30);
-    if (!isNameAlreadyTaken(test, excludeSocketId, clientToken)) {
-      return test;
-    }
-    count++;
-  }
-
-  return `${candidate} #${Math.floor(100 + Math.random() * 900)}`.slice(0, 30);
+  return candidate;
 }
 
 // REST API Endpoints
@@ -1115,7 +1173,8 @@ io.on("connection", (socket: Socket) => {
   // Lắng nghe tích lũy Điểm Công Đức
   socket.on("camlo:earn", (data: { name: string; avatar: string; amount: number; reason?: string; isMonk?: boolean }) => {
     const amount = Math.min(50, Math.max(1, Math.floor(data.amount || 1)));
-    const name = (data.name || "Đạo Hữu").trim().slice(0, 30);
+    let name = (data.name || "Đạo Hữu").trim().slice(0, 30).replace(/\s*#\d+$/, "").trim();
+    if (!name) name = "Đạo Hữu";
     const avatar = data.avatar || "female";
 
     checkDailyReset();
@@ -1157,7 +1216,8 @@ io.on("connection", (socket: Socket) => {
   // Lắng nghe khấu trừ Điểm Công Đức (Hủy nhiệm vụ, etc.)
   socket.on("camlo:deduct", (data: { name: string; amount: number; reason?: string }) => {
     const amount = Math.max(1, Math.floor(data.amount || 10));
-    const name = (data.name || "Đạo Hữu").trim().slice(0, 30);
+    let name = (data.name || "Đạo Hữu").trim().slice(0, 30).replace(/\s*#\d+$/, "").trim();
+    if (!name) name = "Đạo Hữu";
     checkDailyReset();
 
     if (leaderboardState.entries[name]) {
@@ -1199,39 +1259,39 @@ io.on("connection", (socket: Socket) => {
     const clientToken = (data.clientToken || (data as any).token || "").trim();
     const clean = rawName.toLowerCase();
 
-    // DỌN DẸP PHIÊN CŨ KHI F5 / RELOAD TRANG:
-    // Nếu đã có socket cũ trong `players` thuộc về client này hoặc cùng tên, evict ngay lập tức
-    let staleSocketId: string | null = null;
+    // DỌN DẸP TRIỆT ĐỂ TẤT CẢ PHIÊN CŨ KHI F5 / RELOAD TRANG:
+    const staleSocketIds: string[] = [];
     for (const [sId, p] of players.entries()) {
       if (sId !== socket.id) {
+        const basePName = (p.name || "").replace(/\s*#\d+$/, "").trim().toLowerCase();
         const sameToken = Boolean(clientToken && p.clientToken && p.clientToken === clientToken);
-        const sameName = p.name.trim().toLowerCase() === clean;
+        const sameName = basePName === clean;
         if (sameToken || sameName) {
-          staleSocketId = sId;
-          break;
+          staleSocketIds.push(sId);
         }
       }
     }
 
-    if (staleSocketId) {
-      console.log(`🔄 [F5/Reload] Đạo hữu [${rawName}] nạp lại trang. Chuyển giao phiên từ socket ${staleSocketId} sang ${socket.id}`);
-      players.delete(staleSocketId);
+    for (const sId of staleSocketIds) {
+      console.log(`🔄 [F5/Reload] Đạo hữu [${rawName}] nạp lại trang / phiên cũ. Chuyển giao phiên từ socket ${sId} sang ${socket.id}`);
+      players.delete(sId);
       for (const [seatId, info] of occupiedSeats.entries()) {
-        if (info.socketId === staleSocketId) occupiedSeats.delete(seatId);
+        if (info.socketId === sId) occupiedSeats.delete(seatId);
       }
-      const oldSock = io.sockets.sockets.get(staleSocketId);
+      const oldSock = io.sockets.sockets.get(sId);
       if (oldSock) {
         try {
           oldSock.disconnect(true);
         } catch {}
       }
+      socket.broadcast.emit("player:left", sId);
     }
 
     // Luôn đảm bảo dữ liệu Bảng Xếp Hạng không còn sót hậu tố #... do lỗi reload cũ
     cleanupDuplicateSuffixEntries();
 
-    // Bắt buộc tên không được trùng với bất kỳ ai KHÁC đang online
-    const uniqueName = getGuaranteedUniqueName(rawName, socket.id, clientToken);
+    // Tên người chơi là tên gốc nguyên bản (không thêm hậu tố #2, #3)
+    const uniqueName = rawName;
     const isPlayerMonk = uniqueName.startsWith("Thích ") || Boolean((data as any).isMonk);
     const isLoggedIn = Boolean((data as any).isLoggedIn);
 
@@ -1252,20 +1312,22 @@ io.on("connection", (socket: Socket) => {
 
     // Xử lý điểm công đức & bảng xếp hạng khi gia nhập:
     const clientPoints = Math.max(0, Number((data as any).camLoToday) || 0);
-    if (!isLoggedIn) {
-      // Khách vãng lai chưa đăng nhập: Luôn reset điểm công đức về 0
-      leaderboardState.entries[uniqueName] = {
-        name: uniqueName,
-        avatar: data.avatar || "female",
-        camLoToday: 0,
-        totalCamLo: 0,
-        lastUpdated: Date.now(),
-        isMonk: false,
-      };
-      saveLeaderboardData();
-      broadcastLeaderboard();
+    const isDefaultGuest = !isLoggedIn && !isPlayerMonk && (uniqueName === "Đạo Hữu An Nhiên" || uniqueName.startsWith("Khách "));
+
+    if (isDefaultGuest) {
+      // Khách vãng lai mặc định chưa đăng nhập: khởi tạo tạm thời
+      if (!leaderboardState.entries[uniqueName]) {
+        leaderboardState.entries[uniqueName] = {
+          name: uniqueName,
+          avatar: data.avatar || "female",
+          camLoToday: 0,
+          totalCamLo: 0,
+          lastUpdated: Date.now(),
+          isMonk: false,
+        };
+      }
     } else {
-      // Người dùng đã đăng nhập: Khôi phục và đồng bộ điểm công đức thật
+      // Người dùng đã có tên / đã xuất gia / đã đăng nhập: Bảo lưu và đồng bộ điểm công đức thật
       if (!leaderboardState.entries[uniqueName]) {
         leaderboardState.entries[uniqueName] = {
           name: uniqueName,
@@ -1275,27 +1337,19 @@ io.on("connection", (socket: Socket) => {
           lastUpdated: Date.now(),
           isMonk: isPlayerMonk,
         };
-        saveLeaderboardData();
-        syncPlayerToMongo(uniqueName, leaderboardState.entries[uniqueName], clientToken);
-        broadcastLeaderboard();
       } else {
-        let changed = false;
-        const currentServerPoints = leaderboardState.entries[uniqueName].camLoToday || 0;
-        if (clientPoints > currentServerPoints) {
-          leaderboardState.entries[uniqueName].camLoToday = clientPoints;
-          leaderboardState.entries[uniqueName].totalCamLo = Math.max(leaderboardState.entries[uniqueName].totalCamLo || 0, clientPoints);
-          changed = true;
+        const entry = leaderboardState.entries[uniqueName];
+        if (clientPoints > (entry.camLoToday || 0)) {
+          entry.camLoToday = clientPoints;
         }
-        if (isPlayerMonk && !leaderboardState.entries[uniqueName].isMonk) {
-          leaderboardState.entries[uniqueName].isMonk = true;
-          changed = true;
+        if (clientPoints > (entry.totalCamLo || 0)) {
+          entry.totalCamLo = clientPoints;
         }
-        if (changed) {
-          saveLeaderboardData();
-          syncPlayerToMongo(uniqueName, leaderboardState.entries[uniqueName], clientToken);
-          broadcastLeaderboard();
-        }
+        if (isPlayerMonk) entry.isMonk = true;
       }
+      saveLeaderboardData();
+      syncPlayerToMongo(uniqueName, leaderboardState.entries[uniqueName], clientToken);
+      broadcastLeaderboard();
 
       if (isMongoConnected) {
         PlayerProfileModel.findOne({ name: uniqueName }).then((profile) => {
@@ -1307,9 +1361,13 @@ io.on("connection", (socket: Socket) => {
             if (leaderboardState.entries[uniqueName]) {
               leaderboardState.entries[uniqueName].camLoToday = bestToday;
               leaderboardState.entries[uniqueName].totalCamLo = bestTotal;
+              if (profile.isMonk) leaderboardState.entries[uniqueName].isMonk = true;
               saveLeaderboardData();
               broadcastLeaderboard();
             }
+
+            // Gửi điểm công đức thật từ Cloud về client để hiển thị trên thanh trạng thái
+            socket.emit("player:merit_sync", { camLoToday: bestToday, totalCamLo: bestTotal });
 
             // Đồng bộ dữ liệu công quả đã lưu từ MongoDB Atlas về máy người chơi
             const isSameQuestDay = profile.questDate === todayStr;
@@ -1368,6 +1426,78 @@ io.on("connection", (socket: Socket) => {
 
     // Thông báo cho mọi người biết có người mới vào
     socket.broadcast.emit("player:joined", player);
+  });
+
+  // 1.1. Người chơi đăng nhập tài khoản thật (Google OAuth) - cập nhật phiên và đồng bộ DB tức thời
+  socket.on("player:auth_login", async (data: { name: string; isMonk?: boolean; email?: string; clientToken?: string; camLoToday?: number }) => {
+    let cleanName = (data.name || "").replace(/\s*#\d+$/, "").trim();
+    if (!cleanName) cleanName = "Đạo Hữu";
+    const clientToken = (data.clientToken || "").trim();
+    const isPlayerMonk = Boolean(data.isMonk) || cleanName.startsWith("Thích ");
+
+    const player = players.get(socket.id);
+    if (player) {
+      player.name = cleanName;
+      player.isLoggedIn = true;
+      player.isMonk = isPlayerMonk;
+      if (clientToken) player.clientToken = clientToken;
+    }
+
+    if (!leaderboardState.entries[cleanName]) {
+      leaderboardState.entries[cleanName] = {
+        name: cleanName,
+        avatar: player?.avatar || "female",
+        camLoToday: Math.max(0, Number(data.camLoToday) || 0),
+        totalCamLo: Math.max(0, Number(data.camLoToday) || 0),
+        lastUpdated: Date.now(),
+        isMonk: isPlayerMonk,
+      };
+    } else {
+      if (data.camLoToday && data.camLoToday > (leaderboardState.entries[cleanName].camLoToday || 0)) {
+        leaderboardState.entries[cleanName].camLoToday = data.camLoToday;
+      }
+      if (isPlayerMonk) leaderboardState.entries[cleanName].isMonk = true;
+    }
+
+    saveLeaderboardData();
+    syncPlayerToMongo(cleanName, leaderboardState.entries[cleanName], clientToken);
+    broadcastLeaderboard();
+
+    if (isMongoConnected) {
+      try {
+        const profile = await PlayerProfileModel.findOne({ name: cleanName });
+        if (profile) {
+          const todayStr = getVietnamDateString();
+          const cloudToday = profile.lastDate === todayStr ? (profile.camLoToday || 0) : 0;
+          const bestToday = Math.max(cloudToday, Number(data.camLoToday) || 0, leaderboardState.entries[cleanName]?.camLoToday || 0);
+          const bestTotal = Math.max(profile.totalCamLo || 0, leaderboardState.entries[cleanName]?.totalCamLo || 0, bestToday);
+
+          leaderboardState.entries[cleanName].camLoToday = bestToday;
+          leaderboardState.entries[cleanName].totalCamLo = bestTotal;
+          saveLeaderboardData();
+          broadcastLeaderboard();
+
+          socket.emit("player:merit_sync", { camLoToday: bestToday, totalCamLo: bestTotal });
+
+          const isSameQuestDay = profile.questDate === todayStr;
+          const questData = {
+            date: todayStr,
+            completedCount: isSameQuestDay ? Math.min(10, Math.max(0, profile.questsCompletedToday || 0)) : 0,
+            completedQuestIds: isSameQuestDay && Array.isArray(profile.completedQuestIds) ? profile.completedQuestIds : [],
+            activeQuestId: isSameQuestDay ? (profile.activeQuestId || null) : null,
+            activeQuestWorkDone: isSameQuestDay ? Boolean(profile.activeQuestWorkDone) : false,
+          };
+          socket.emit("quest:sync_from_server", questData);
+
+          if (profile.robeColor) {
+            if (player) player.robeColor = profile.robeColor;
+            socket.emit("player:robe_sync", { robeColor: profile.robeColor });
+          }
+        }
+      } catch (err) {
+        console.warn("Lỗi sync DB khi player:auth_login:", err);
+      }
+    }
   });
 
   // 1.5. Quản lý chỗ ngồi duy nhất trong Chính Điện (Chỉ 1 người / 1 chỗ, ai ngồi rồi người khác không được ngồi)
@@ -1606,11 +1736,8 @@ io.on("connection", (socket: Socket) => {
     const player = players.get(socket.id);
     const oldName = player?.name || "Đạo hữu";
 
-    // Đảm bảo pháp danh xuất gia không bị trùng lặp
+    // Đảm bảo pháp danh xuất gia nguyên bản, không bao giờ gán hậu tố #2, #3
     cleanName = cleanName.replace(/\s*#\d+$/, "").trim();
-    if (isNameAlreadyTaken(cleanName, socket.id, player?.clientToken)) {
-      cleanName = getGuaranteedUniqueName(cleanName, socket.id, player?.clientToken);
-    }
 
     if (player) {
       player.name = cleanName;
@@ -1730,7 +1857,9 @@ io.on("connection", (socket: Socket) => {
   // 3.4. Lưu và đồng bộ tiến trình công quả thiền môn lên MongoDB Atlas
   socket.on("quest:update", async (data: any) => {
     const player = players.get(socket.id);
-    if (!player || !player.isLoggedIn) return;
+    if (!player) return;
+    const name = (player.name || "").replace(/\s*#\d+$/, "").trim();
+    if (!name || name === "Đạo Hữu An Nhiên") return;
     const todayStr = getVietnamDateString();
     const completedCount = Math.min(10, Math.max(0, Number(data.completedCount) || 0));
     const completedQuestIds = Array.isArray(data.completedQuestIds) ? data.completedQuestIds : [];
@@ -1740,7 +1869,7 @@ io.on("connection", (socket: Socket) => {
     if (isMongoConnected) {
       try {
         await PlayerProfileModel.updateOne(
-          { name: player.name },
+          { name },
           {
             $set: {
               questDate: todayStr,
@@ -1899,11 +2028,16 @@ io.on("connection", (socket: Socket) => {
   socket.on("disconnect", () => {
     console.log(`🍃 Đạo hữu rời bước: ${socket.id}`);
     const player = players.get(socket.id);
-    if (player && !player.isLoggedIn) {
-      // Khách chưa đăng nhập: Dọn dẹp khỏi bảng xếp hạng khi rời mạng
-      delete leaderboardState.entries[player.name];
-      saveLeaderboardData();
-      broadcastLeaderboard();
+    if (player) {
+      const isMonk = player.isMonk || player.name.startsWith("Thích ");
+      const isDefaultGuest = !player.isLoggedIn && !isMonk && (player.name === "Đạo Hữu An Nhiên" || player.name.startsWith("Khách "));
+      const points = (leaderboardState.entries[player.name]?.camLoToday || 0) + (leaderboardState.entries[player.name]?.totalCamLo || 0);
+      if (isDefaultGuest && points === 0) {
+        // Khách mặc định chưa đăng nhập và chưa có điểm: Dọn dẹp khỏi bảng xếp hạng khi rời mạng
+        delete leaderboardState.entries[player.name];
+        saveLeaderboardData();
+        broadcastLeaderboard();
+      }
     }
     players.delete(socket.id);
 

@@ -1101,18 +1101,28 @@ class ChuaAnLacGame {
     });
 
     network.onPlayerNameAdjusted((data) => {
-      this.player.createNameTag(data.name);
-      this.gameUI.setPlayerInfo(data.name, this.player.gender);
+      const cleanName = (data.name || "").replace(/\s*#\d+$/, "").trim();
+      this.player.createNameTag(cleanName);
+      this.gameUI.setPlayerInfo(cleanName, this.player.gender);
       try {
-        localStorage.setItem("chua_an_lac_player_name", data.name);
-        if (data.name.startsWith("Thích ")) {
-          localStorage.setItem("chua_an_lac_dharma_name", data.name);
+        localStorage.setItem("chua_an_lac_player_name", cleanName);
+        if (cleanName.startsWith("Thích ")) {
+          localStorage.setItem("chua_an_lac_dharma_name", cleanName);
         }
       } catch {}
       this.gameUI.appendChatMessage(
         "Hệ Thống",
-        `ℹ️ Tên của đạo hữu đã được đồng bộ: [${data.name}]! 🙏`,
+        `ℹ️ Tên của đạo hữu đã được đồng bộ: [${cleanName}]! 🙏`,
       );
+    });
+
+    network.onPlayerMeritSync((data) => {
+      if (typeof data?.camLoToday === "number") {
+        this.gameUI.setMeritPoints(data.camLoToday);
+        try {
+          saveMeritPoints(this.player.name, data.camLoToday);
+        } catch {}
+      }
     });
 
     network.onPlayerRenameFailed((data) => {

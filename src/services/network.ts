@@ -120,6 +120,7 @@ export class NetworkService {
   private onQuestSyncFromServerCb?: (data: any) => void;
   private onPlayerRobeChangedCb?: (data: { id: string; name: string; robeColor: number }) => void;
   private onPlayerRobeSyncCb?: (data: { robeColor: number }) => void;
+  private onPlayerMeritSyncCb?: (data: { camLoToday: number; totalCamLo: number }) => void;
 
   private constructor() {
     this.latestLeaderboard = this.getFallbackLeaderboard();
@@ -316,6 +317,11 @@ export class NetworkService {
       // Lắng nghe đồng bộ màu áo cá nhân từ DB
       this.socket.on("player:robe_sync", (data: { robeColor: number }) => {
         if (this.onPlayerRobeSyncCb) this.onPlayerRobeSyncCb(data);
+      });
+
+      // Lắng nghe đồng bộ điểm công đức thật từ Cloud
+      this.socket.on("player:merit_sync", (data: { camLoToday: number; totalCamLo: number }) => {
+        if (this.onPlayerMeritSyncCb) this.onPlayerMeritSyncCb(data);
       });
     } catch {
       this.isConnected = false;
@@ -635,6 +641,16 @@ export class NetworkService {
 
   public onPlayerRobeSync(cb: (data: { robeColor: number }) => void) {
     this.onPlayerRobeSyncCb = cb;
+  }
+
+  public onPlayerMeritSync(cb: (data: { camLoToday: number; totalCamLo: number }) => void) {
+    this.onPlayerMeritSyncCb = cb;
+  }
+
+  public sendAuthLogin(data: { name: string; isMonk?: boolean; email?: string; clientToken?: string; camLoToday?: number }) {
+    if (this.socket && this.isConnected) {
+      this.socket.emit("player:auth_login", data);
+    }
   }
 }
 

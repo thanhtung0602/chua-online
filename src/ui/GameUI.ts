@@ -19,6 +19,7 @@ import {
 import {
   network,
   type LeaderboardPayload,
+  getClientSessionToken,
 } from "../services/network";
 import {
   CHANT_DATABASE,
@@ -2196,7 +2197,7 @@ export class GameUI {
       );
       this.updateAuthUI();
 
-      const newName = user.dharmaName || user.name;
+      const newName = (user.dharmaName || user.name || "").replace(/\s*#\d+$/, "").trim();
       if (newName && newName !== this.playerName) {
         this.playerName = newName;
         this.callbacks.onChangePlayerName?.(newName);
@@ -2208,6 +2209,14 @@ export class GameUI {
       const userSaved = getSavedMeritPoints(this.playerName);
       const combined = Math.max(prevPoints, userSaved);
       this.setMeritPoints(combined);
+
+      network.sendAuthLogin({
+        name: this.playerName,
+        isMonk: authService.isMonk() || this.playerName.startsWith("Thích "),
+        email: user.email,
+        clientToken: getClientSessionToken(),
+        camLoToday: combined,
+      });
 
       hideAuthModal();
     };
@@ -5010,8 +5019,12 @@ export class GameUI {
       `;
     }
 
-    // Cộng điểm công đức trên client
-    this.incrementCamLo(points, `Cúng Dường ${order.packageName || "Tam Bảo"}`);
+    // Cập nhật điểm công đức hiển thị trên client (Server đã cộng chính xác vào DB & Bảng Xếp Hạng)
+    this.setMeritPoints(this.getMeritPoints() + points);
+    this.appendChatMessage(
+      "Hệ Thống",
+      `🪷 Bạn vừa tích lũy +${points.toLocaleString()} Điểm Công Đức (Cúng Dường ${order.packageName || "Tam Bảo"}).`
+    );
 
     // Gửi yêu cầu cập nhật lại Bảng Xếp Hạng mới nhất từ server
     network.requestLeaderboard();
@@ -5025,7 +5038,7 @@ export class GameUI {
         zenAudio.playGrandBell();
         zenAudio.playLotusSound();
         const pts = Number(data.meritPoints) || 0;
-        this.incrementCamLo(pts, `Cúng Dường ${data.packageName || "Tam Bảo"}`);
+        this.setMeritPoints(this.getMeritPoints() + pts);
         this.appendChatMessage(
           "Chùa",
           `🌸 Quý đạo hữu đã cúng dường thành công ${Number(data.amount).toLocaleString("vi-VN")}đ, nhận được +${pts.toLocaleString("vi-VN")} Điểm Công Đức! A Di Đà Phật 🙏`

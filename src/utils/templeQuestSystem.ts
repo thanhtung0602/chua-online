@@ -221,7 +221,7 @@ export class TempleQuestManager {
       console.warn("⚠️ Không thể lưu quest state:", e);
     }
 
-    if (syncToNetwork && authService.isLoggedIn()) {
+    if (syncToNetwork && (authService.isLoggedIn() || authService.isMonk())) {
       try {
         network.sendQuestUpdate(state);
       } catch (e) {
