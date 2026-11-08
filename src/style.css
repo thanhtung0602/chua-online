@@ -832,10 +832,10 @@ body.modal-open .teleport-dropdown-panel {
 .virtual-joystick-zone {
   display: none;
   position: absolute;
-  bottom: 18px;
-  left: 18px;
-  width: 135px;
-  height: 135px;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  left: max(12px, env(safe-area-inset-left));
+  width: 115px;
+  height: 115px;
   z-index: 85;
   pointer-events: auto;
   touch-action: none;
@@ -852,9 +852,9 @@ body.modal-open .teleport-dropdown-panel {
 
 .joystick-base {
   position: relative;
-  width: 120px;
-  height: 120px;
-  margin: 7px;
+  width: 105px;
+  height: 105px;
+  margin: 5px;
   border-radius: 50%;
   background: radial-gradient(circle at 50% 50%, rgba(20, 36, 26, 0.72) 0%, rgba(12, 22, 16, 0.88) 70%, rgba(6, 12, 9, 0.96) 100%);
   border: 2px solid rgba(212, 175, 55, 0.45);
@@ -980,33 +980,41 @@ body.modal-open .teleport-dropdown-panel {
 }
 
 @media (max-width: 768px), (max-height: 550px) {
-  /* TOP NAV GỌN GÀNG TRÊN MOBILE / THU NHỎ MÀN HÌNH - KHÔNG CHE TẦM NHÌN */
+  /* TOP NAV GỌN GÀNG TRÊN MOBILE / THU NHỎ MÀN HÌNH - KHÔNG CHE TẦM NHÌN, TƯƠNG THÍCH TAI THỎ / DYNAMIC ISLAND */
   .top-nav-bar {
-    top: 4px;
-    left: 6px;
-    right: 6px;
-    gap: 4px;
+    top: max(4px, env(safe-area-inset-top));
+    left: max(4px, env(safe-area-inset-left));
+    right: max(4px, env(safe-area-inset-right));
+    gap: 3px;
   }
 
   .top-nav {
-    padding: 2px 8px;
+    padding: 2px 6px;
     border-radius: 10px;
     gap: 4px;
     min-height: 32px;
     height: 32px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    max-width: 100%;
+  }
+
+  .top-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .brand {
-    gap: 5px;
+    gap: 4px;
     flex-shrink: 0;
   }
 
   .temple-icon {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .temple-title {
-    font-size: 11.5px;
+    font-size: 11px;
     white-space: nowrap;
   }
 
@@ -1028,30 +1036,32 @@ body.modal-open .teleport-dropdown-panel {
   }
 
   .user-stats {
-    gap: 3px;
+    gap: 2px;
     flex-shrink: 0;
+    align-items: center;
   }
 
   .stat-badge {
-    padding: 2px 6px;
-    font-size: 10.5px;
-    height: 24px;
+    padding: 1px 5px;
+    font-size: 10px;
+    height: 22px;
+    flex-shrink: 0;
   }
 
   .auth-badge {
-    max-width: 95px;
+    max-width: 85px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 2px 6px;
-    font-size: 10.5px;
+    padding: 1px 5px;
+    font-size: 10px;
   }
 
   .auth-badge b {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 70px;
+    max-width: 60px;
     display: inline-block;
     vertical-align: middle;
   }
@@ -1133,25 +1143,28 @@ body.modal-open .teleport-dropdown-panel {
 
   /* NÚT MỞ KHUNG ĐÀM LUẬN NỔI: ĐẶT PHÍA TRÊN VÙNG JOYSTICK ĐỂ KHÔNG VƯỚNG TAY */
   .floating-chat-pill {
-    bottom: 160px;
-    left: 14px;
-    padding: 5px 10px;
-    font-size: 11px;
-    border-radius: 16px;
+    bottom: max(142px, calc(env(safe-area-inset-bottom) + 128px));
+    left: max(12px, env(safe-area-inset-left));
+    padding: 4px 9px;
+    font-size: 10.5px;
+    border-radius: 14px;
+    z-index: 90;
   }
 
-  /* BOTTOM ACTION BAR TRÊN MOBILE: CHỪA GÓC TRÁI CHO CẦN GẠT JOYSTICK */
+  /* BOTTOM ACTION BAR TRÊN MOBILE: NẰM GỌN BÊN PHẢI (CHỪA TRỌN GÓC TRÁI CHO CẦN GẠT JOYSTICK) */
   .bottom-action-bar {
-    bottom: 5px;
-    left: calc(50% + 40px);
-    transform: translateX(-50%);
+    bottom: max(6px, env(safe-area-inset-bottom));
+    left: auto;
+    right: max(6px, env(safe-area-inset-right));
+    transform: none;
     gap: 3px;
     padding: 3px 6px;
-    max-width: calc(100vw - 165px);
+    max-width: calc(100vw - 136px);
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     flex-wrap: nowrap;
+    z-index: 80;
   }
 
   .bottom-action-bar::-webkit-scrollbar {
@@ -1160,12 +1173,12 @@ body.modal-open .teleport-dropdown-panel {
 
   .action-btn {
     flex-shrink: 0;
-    min-width: 44px;
+    min-width: 42px;
     padding: 3px 4px;
   }
 
   .action-btn .btn-icon {
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .action-btn .btn-label {
@@ -1195,25 +1208,27 @@ body.modal-open .teleport-dropdown-panel {
 }
 
 @media (max-width: 768px), (max-height: 550px) {
-  /* MAIN HALL HUD TRÊN MOBILE */
+  /* MAIN HALL HUD TRÊN MOBILE: ĐẶT BÊN PHẢI TRÊN BOTTOM ACTION BAR, TRÁNH 100% VÙNG JOYSTICK */
   .mainhall-hud {
-    bottom: 80px;
-    left: 50%;
-    transform: translateX(-50%);
-    max-width: calc(100vw - 16px);
+    bottom: max(66px, calc(env(safe-area-inset-bottom) + 56px));
+    right: max(6px, env(safe-area-inset-right));
+    left: auto;
+    transform: none;
+    max-width: min(300px, calc(100vw - 136px));
     width: auto;
-    padding: 6px 10px;
+    padding: 5px 8px;
+    z-index: 82;
   }
 
   .mainhall-title {
-    font-size: 11.5px;
-    gap: 8px;
+    font-size: 10.5px;
+    gap: 6px;
   }
 
   .hall-btn {
-    font-size: 11px;
-    padding: 4px 8px;
-    border-radius: 10px;
+    font-size: 10px;
+    padding: 3px 6px;
+    border-radius: 8px;
   }
 }
 

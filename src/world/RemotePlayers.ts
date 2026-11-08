@@ -673,9 +673,12 @@ export class RemotePlayersManager {
     const isDoubleLine = isAbbot || isSenior || isMonkTag;
 
     const canvas = document.createElement("canvas");
-    canvas.width = 380;
-    canvas.height = isDoubleLine ? 96 : 64;
+    // Tăng gấp đôi độ phân giải (Supersampling 2x) cho texture chữ sắc nét trên màn hình Retina / iPhone / Android
+    const scaleFactor = 2;
+    canvas.width = 380 * scaleFactor;
+    canvas.height = (isDoubleLine ? 96 : 64) * scaleFactor;
     const ctx = canvas.getContext("2d")!;
+    ctx.scale(scaleFactor, scaleFactor);
 
     if (isAbbot) {
       ctx.fillStyle = "rgba(18, 14, 8, 0.95)";
@@ -783,6 +786,11 @@ export class RemotePlayersManager {
     }
 
     const tex = new THREE.CanvasTexture(canvas);
+    // Tắt Mipmaps để Three.js không làm mờ nhòe chữ khi camera ở xa hoặc góc nghiêng
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = false;
+    tex.needsUpdate = true;
     const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
     const sprite = new THREE.Sprite(mat);
     sprite.position.set(0, isDoubleLine ? 2.45 : 2.35, 0);

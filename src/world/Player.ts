@@ -825,9 +825,12 @@ export class Player {
     const isDoubleLine = this.isAbbot || isSenior || isMonkTag;
 
     const canvas = document.createElement("canvas");
-    canvas.width = 380;
-    canvas.height = isDoubleLine ? 96 : 64;
+    // Tăng gấp đôi độ phân giải (Supersampling 2x) để chữ sắc nét tuyệt đối trên màn hình Retina / iPhone / Android
+    const scaleFactor = 2;
+    canvas.width = 380 * scaleFactor;
+    canvas.height = (isDoubleLine ? 96 : 64) * scaleFactor;
     const ctx = canvas.getContext("2d")!;
+    ctx.scale(scaleFactor, scaleFactor);
 
     if (this.isAbbot) {
       // 1. Nền vàng kim hoàng gia trang nghiêm cho Trụ Trì
@@ -945,6 +948,11 @@ export class Player {
     }
 
     const tex = new THREE.CanvasTexture(canvas);
+    // Tắt Mipmaps để Three.js không làm mờ nhòe chữ khi camera ở xa hoặc góc nghiêng
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = false;
+    tex.needsUpdate = true;
     const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
     this.nameTag = new THREE.Sprite(mat);
     this.nameTag.position.set(0, isDoubleLine ? 2.45 : 2.35, 0);

@@ -93,8 +93,8 @@ class ChuaAnLacGame {
       precision: isMobileDevice ? "mediump" : "highp",
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    // Trên mobile render tỷ lệ 1.0 chuẩn native để nhẹ GPU, trên PC là 1.25
-    this.renderer.setPixelRatio(isMobileDevice ? 1.0 : Math.min(window.devicePixelRatio, 1.25));
+    // Trên mobile render tối đa 1.6 (thay vì 1.0) để đạt độ nét cao chuẩn Retina, không bị mờ nhòe chữ và mô hình
+    this.renderer.setPixelRatio(isMobileDevice ? Math.min(window.devicePixelRatio, 1.6) : Math.min(window.devicePixelRatio, 1.5));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1482,8 +1482,11 @@ class ChuaAnLacGame {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
-    const isMobileDevice = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (w <= 960 && h <= 600);
-    this.renderer.setPixelRatio(isMobileDevice ? 1.0 : Math.min(window.devicePixelRatio, 1.25));
+    const isMobileDevice =
+      /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      (w <= 960 && h <= 600) ||
+      (w <= 600 && h <= 960);
+    this.renderer.setPixelRatio(isMobileDevice ? Math.min(window.devicePixelRatio, 1.6) : Math.min(window.devicePixelRatio, 1.5));
   }
 }
 
