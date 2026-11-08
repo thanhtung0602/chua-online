@@ -48,7 +48,9 @@ export function isNameTakenInGame(
 ): boolean {
   const clean = nameToCheck.trim().toLowerCase();
   const selfClean = currentSelfName.trim().toLowerCase();
-  if (clean === selfClean) return false; // Trùng với chính mình thì hợp lệ
+  const cleanBase = clean.replace(/\s*#\d+$/, "");
+  const selfBase = selfClean.replace(/\s*#\d+$/, "");
+  if (clean === selfClean || (cleanBase && cleanBase === selfBase)) return false; // Trùng với chính mình thì hợp lệ
 
   if (!leaderboard) return false;
 

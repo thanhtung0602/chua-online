@@ -42,6 +42,7 @@ const PlayerProfileSchema = new mongoose.Schema(
     avatar: String,
     isMonk: Boolean,
     dharmaName: String,
+    clientToken: { type: String, index: true },
     camLoToday: { type: Number, default: 0 },
     totalCamLo: { type: Number, default: 0 },
     totalDonated: { type: Number, default: 0 },
@@ -288,6 +289,7 @@ interface PlayerState {
   dir: "left" | "right";
   isLoggedIn?: boolean;
   isMonk?: boolean;
+  clientToken?: string;
 }
 
 interface ServerLantern {
@@ -491,22 +493,126 @@ function saveLeaderboardData() {
   }
 }
 
-function syncPlayerToMongo(name: string, entry?: LeaderboardEntry) {
+function cleanupDuplicateSuffixEntries(): boolean {
+  let changed = false;
+  const entries = leaderboardState.entries;
+  if (entries) {
+    for (const key of Object.keys(entries)) {
+      const match = key.match(/^(.*?)\s*#\d+$/);
+      if (match) {
+        const baseName = match[1].trim();
+        const dup = entries[key];
+        if (baseName) {
+          if (!entries[baseName]) {
+            entries[baseName] = {
+              ...dup,
+              name: baseName,
+              isMonk: baseName.startsWith("Thích ") || Boolean(dup.isMonk),
+            };
+          } else {
+            entries[baseName].camLoToday = Math.max(entries[baseName].camLoToday || 0, dup.camLoToday || 0);
+            entries[baseName].totalCamLo = Math.max(entries[baseName].totalCamLo || 0, dup.totalCamLo || 0);
+            entries[baseName].totalDonated = Math.max(entries[baseName].totalDonated || 0, dup.totalDonated || 0);
+            entries[baseName].donationCount = Math.max(entries[baseName].donationCount || 0, dup.donationCount || 0);
+          }
+        }
+        delete entries[key];
+        changed = true;
+      }
+    }
+  }
+
+  if (Array.isArray(leaderboardState.seniorMonks)) {
+    const cleaned: SeniorMonkInfo[] = [];
+    const seen = new Set<string>();
+    for (const monk of leaderboardState.seniorMonks) {
+      const cleanName = monk.name.replace(/\s*#\d+$/, "").trim();
+      if (!seen.has(cleanName)) {
+        seen.add(cleanName);
+        cleaned.push({ ...monk, name: cleanName });
+        if (monk.name !== cleanName) changed = true;
+      } else {
+        changed = true;
+      }
+    }
+    leaderboardState.seniorMonks = cleaned;
+  }
+
+  if (leaderboardState.currentAbbot?.name) {
+    const cleanAbbot = leaderboardState.currentAbbot.name.replace(/\s*#\d+$/, "").trim();
+    if (cleanAbbot !== leaderboardState.currentAbbot.name) {
+      leaderboardState.currentAbbot.name = cleanAbbot;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    saveLeaderboardData();
+    console.log("🧹 Đã tự động dọn dẹp và gộp các hồ sơ bị trùng lặp hậu tố (#2, #3,...) về tên gốc.");
+  }
+  return changed;
+}
+
+// Khởi chạy dọn dẹp cục bộ ngay khi khởi động
+cleanupDuplicateSuffixEntries();
+
+async function cleanupMongoDuplicateSuffixEntries() {
+  if (!isMongoConnected) return;
+  try {
+    const dupProfiles = await PlayerProfileModel.find({ name: { $regex: /#\d+$/ } }).lean();
+    if (dupProfiles && dupProfiles.length > 0) {
+      console.log(`🧹 [MongoDB Atlas] Tìm thấy ${dupProfiles.length} bản ghi trùng lặp có hậu tố #... Đang gộp dữ liệu...`);
+      for (const dup of dupProfiles) {
+        const baseName = dup.name.replace(/\s*#\d+$/, "").trim();
+        if (baseName) {
+          await PlayerProfileModel.findOneAndUpdate(
+            { name: baseName },
+            {
+              $max: {
+                camLoToday: dup.camLoToday || 0,
+                totalCamLo: dup.totalCamLo || 0,
+                totalDonated: dup.totalDonated || 0,
+                donationCount: dup.donationCount || 0,
+              },
+            },
+            { upsert: true }
+          );
+        }
+        await PlayerProfileModel.deleteOne({ _id: dup._id });
+      }
+    }
+
+    const dupOrders = await DonationOrderModel.find({ playerName: { $regex: /#\d+$/ } });
+    if (dupOrders && dupOrders.length > 0) {
+      for (const ord of dupOrders) {
+        ord.playerName = ord.playerName.replace(/\s*#\d+$/, "").trim();
+        await ord.save();
+      }
+    }
+  } catch (err) {
+    console.warn("⚠️ [MongoDB Atlas] Lỗi khi dọn dẹp bản ghi có hậu tố #...:", err);
+  }
+}
+
+function syncPlayerToMongo(name: string, entry?: LeaderboardEntry, clientToken?: string) {
   if (!isMongoConnected || !name) return;
   const target = entry || leaderboardState.entries[name];
   if (!target) return;
   const todayStr = getVietnamDateString();
+  const updateData: any = {
+    avatar: target.avatar,
+    isMonk: target.isMonk,
+    camLoToday: target.camLoToday,
+    totalCamLo: target.totalCamLo,
+    lastDate: todayStr,
+  };
+  if (clientToken) updateData.clientToken = clientToken;
+  if (target.totalDonated !== undefined) updateData.totalDonated = target.totalDonated;
+  if (target.donationCount !== undefined) updateData.donationCount = target.donationCount;
+
   PlayerProfileModel.updateOne(
     { name },
-    {
-      $set: {
-        avatar: target.avatar,
-        isMonk: target.isMonk,
-        camLoToday: target.camLoToday,
-        totalCamLo: target.totalCamLo,
-        lastDate: todayStr,
-      },
-    },
+    { $set: updateData },
     { upsert: true }
   ).catch((e) => console.warn("⚠️ [MongoDB] Lỗi lưu PlayerProfile:", e.message));
 }
@@ -534,9 +640,11 @@ async function initMongoConnection() {
         leaderboardState.currentDate = cloudDoc.currentDate || todayStr;
         checkDailyReset();
       }
+      cleanupDuplicateSuffixEntries();
+      await cleanupMongoDuplicateSuffixEntries();
       saveLeaderboardData();
       broadcastLeaderboard();
-      console.log(`✨ [MongoDB Atlas] Đã nạp thành công Bảng Xếp Hạng & Công Đức của ${Object.keys(leaderboardState.entries).length} người chơi từ Cloud.`);
+      console.log(`✨ [MongoDB Atlas] Đã nạp và chuẩn hóa thành công Bảng Xếp Hạng & Công Đức của ${Object.keys(leaderboardState.entries).length} người chơi từ Cloud.`);
     } else {
       await LeaderboardModel.create({
         docId: "active_leaderboard",
@@ -749,34 +857,19 @@ const io = new Server(server, {
 // ─────────────────────────────────────────────
 // QUẢN LÝ TÍNH DUY NHẤT CỦA TÊN NGƯỜI CHƠI (KHÔNG ĐƯỢC TRÙNG NHAU)
 // ─────────────────────────────────────────────
-function isNameAlreadyTaken(name: string, excludeSocketId?: string): boolean {
+function isNameAlreadyTaken(name: string, excludeSocketId?: string, clientToken?: string): boolean {
   const clean = name.trim().toLowerCase();
   if (!clean) return true;
 
-  // 1. Kiểm tra với tất cả người chơi đang kết nối online trong chùa
+  // Kiểm tra với tất cả người chơi đang kết nối online trong chùa
   for (const [sId, p] of players.entries()) {
-    if (sId !== excludeSocketId && p.name.trim().toLowerCase() === clean) {
-      return true;
-    }
-  }
-
-  // 2. Kiểm tra với Đương Kim Trụ Trì & 12 Vị Cao Tăng (trừ khi chính người đó đang sở hữu)
-  if (leaderboardState.currentAbbot?.name) {
-    if (leaderboardState.currentAbbot.name.trim().toLowerCase() === clean) {
-      const isSelf = Array.from(players.entries()).some(
-        ([sId, p]) => sId === excludeSocketId && p.name.trim().toLowerCase() === clean
-      );
-      if (!isSelf) return true;
-    }
-  }
-
-  if (Array.isArray(leaderboardState.seniorMonks)) {
-    for (const monk of leaderboardState.seniorMonks) {
-      if (monk.name.trim().toLowerCase() === clean) {
-        const isSelf = Array.from(players.entries()).some(
-          ([sId, p]) => sId === excludeSocketId && p.name.trim().toLowerCase() === clean
-        );
-        if (!isSelf) return true;
+    if (sId !== excludeSocketId) {
+      // Nếu là cùng 1 phiên làm việc (cùng clientToken), không tính là bị trùng do đây là reload/reconnect
+      if (clientToken && p.clientToken && p.clientToken === clientToken) {
+        continue;
+      }
+      if (p.name.trim().toLowerCase() === clean) {
+        return true;
       }
     }
   }
@@ -784,17 +877,21 @@ function isNameAlreadyTaken(name: string, excludeSocketId?: string): boolean {
   return false;
 }
 
-function getGuaranteedUniqueName(baseName: string, excludeSocketId?: string): string {
+function getGuaranteedUniqueName(baseName: string, excludeSocketId?: string, clientToken?: string): string {
   let candidate = (baseName || "Đạo Hữu").trim().slice(0, 30);
-  if (!isNameAlreadyTaken(candidate, excludeSocketId)) {
+  // Luôn gỡ bỏ hậu tố #... nếu có trước khi kiểm tra
+  candidate = candidate.replace(/\s*#\d+$/, "").trim();
+  if (!candidate) candidate = "Đạo Hữu";
+
+  if (!isNameAlreadyTaken(candidate, excludeSocketId, clientToken)) {
     return candidate;
   }
 
-  // Thêm hậu tố số tăng dần hoặc mã ngẫu nhiên để luôn đảm bảo không bị trùng
+  // Thêm hậu tố số tăng dần nếu thực sự đang có một người chơi KHÁC online trùng tên
   let count = 2;
   while (count <= 99) {
     const test = `${candidate} #${count}`.slice(0, 30);
-    if (!isNameAlreadyTaken(test, excludeSocketId)) {
+    if (!isNameAlreadyTaken(test, excludeSocketId, clientToken)) {
       return test;
     }
     count++;
@@ -1073,7 +1170,8 @@ io.on("connection", (socket: Socket) => {
       if (typeof callback === "function") callback({ available: false, reason: "Tên phải có ít nhất 2 ký tự" });
       return;
     }
-    const taken = isNameAlreadyTaken(raw, socket.id);
+    const player = players.get(socket.id);
+    const taken = isNameAlreadyTaken(raw, socket.id, player?.clientToken);
     if (typeof callback === "function") {
       callback({
         available: !taken,
@@ -1083,10 +1181,49 @@ io.on("connection", (socket: Socket) => {
   });
 
   // 1. Gia nhập thế giới chùa (Không giới hạn người chơi, mỗi người tên duy nhất)
-  socket.on("player:join", (data: { name: string; avatar: string; gx: number; gy: number; isLoggedIn?: boolean; isMonk?: boolean }) => {
-    const rawName = (data.name || "Đạo Hữu").trim().slice(0, 30);
-    // Bắt buộc tên không được trùng với bất kỳ ai
-    const uniqueName = getGuaranteedUniqueName(rawName, socket.id);
+  socket.on("player:join", (data: { name: string; avatar: string; gx: number; gy: number; isLoggedIn?: boolean; isMonk?: boolean; clientToken?: string }) => {
+    let rawName = (data.name || "Đạo Hữu").trim().slice(0, 30);
+    const originalInputName = rawName;
+    // Tự động gỡ bỏ hậu tố #2, #3 nếu trước đó bị lỗi gán nhầm
+    rawName = rawName.replace(/\s*#\d+$/, "").trim();
+    if (!rawName) rawName = "Đạo Hữu";
+
+    const clientToken = (data.clientToken || (data as any).token || "").trim();
+    const clean = rawName.toLowerCase();
+
+    // DỌN DẸP PHIÊN CŨ KHI F5 / RELOAD TRANG:
+    // Nếu đã có socket cũ trong `players` thuộc về client này hoặc cùng tên, evict ngay lập tức
+    let staleSocketId: string | null = null;
+    for (const [sId, p] of players.entries()) {
+      if (sId !== socket.id) {
+        const sameToken = Boolean(clientToken && p.clientToken && p.clientToken === clientToken);
+        const sameName = p.name.trim().toLowerCase() === clean;
+        if (sameToken || sameName) {
+          staleSocketId = sId;
+          break;
+        }
+      }
+    }
+
+    if (staleSocketId) {
+      console.log(`🔄 [F5/Reload] Đạo hữu [${rawName}] nạp lại trang. Chuyển giao phiên từ socket ${staleSocketId} sang ${socket.id}`);
+      players.delete(staleSocketId);
+      for (const [seatId, info] of occupiedSeats.entries()) {
+        if (info.socketId === staleSocketId) occupiedSeats.delete(seatId);
+      }
+      const oldSock = io.sockets.sockets.get(staleSocketId);
+      if (oldSock) {
+        try {
+          oldSock.disconnect(true);
+        } catch {}
+      }
+    }
+
+    // Luôn đảm bảo dữ liệu Bảng Xếp Hạng không còn sót hậu tố #... do lỗi reload cũ
+    cleanupDuplicateSuffixEntries();
+
+    // Bắt buộc tên không được trùng với bất kỳ ai KHÁC đang online
+    const uniqueName = getGuaranteedUniqueName(rawName, socket.id, clientToken);
     const isPlayerMonk = uniqueName.startsWith("Thích ") || Boolean((data as any).isMonk);
     const isLoggedIn = Boolean((data as any).isLoggedIn);
 
@@ -1100,6 +1237,7 @@ io.on("connection", (socket: Socket) => {
       dir: "right",
       isLoggedIn,
       isMonk: isPlayerMonk,
+      clientToken,
     };
 
     players.set(socket.id, player);
@@ -1130,7 +1268,7 @@ io.on("connection", (socket: Socket) => {
           isMonk: isPlayerMonk,
         };
         saveLeaderboardData();
-        syncPlayerToMongo(uniqueName, leaderboardState.entries[uniqueName]);
+        syncPlayerToMongo(uniqueName, leaderboardState.entries[uniqueName], clientToken);
         broadcastLeaderboard();
       } else {
         let changed = false;
@@ -1146,7 +1284,7 @@ io.on("connection", (socket: Socket) => {
         }
         if (changed) {
           saveLeaderboardData();
-          syncPlayerToMongo(uniqueName, leaderboardState.entries[uniqueName]);
+          syncPlayerToMongo(uniqueName, leaderboardState.entries[uniqueName], clientToken);
           broadcastLeaderboard();
         }
       }
@@ -1172,12 +1310,14 @@ io.on("connection", (socket: Socket) => {
     // Cập nhật số người trong phòng cho tất cả đạo hữu
     broadcastRoomCount();
 
-    // Nếu tên ban đầu bị trùng và được tự động điều chỉnh, gửi thông báo cho client
-    if (uniqueName !== rawName) {
+    // Nếu tên ban đầu bị trùng hoặc bị dính hậu tố #2 cũ và được tự động điều chỉnh, gửi thông báo cho client
+    if (uniqueName !== originalInputName) {
       socket.emit("player:name_adjusted", {
         name: uniqueName,
-        original: rawName,
-        reason: "Tên ban đầu đã có đạo hữu khác sử dụng trong chùa",
+        original: originalInputName,
+        reason: uniqueName === rawName
+          ? "Đã chuẩn hóa và khôi phục tên gốc của đạo hữu"
+          : "Tên ban đầu đã có đạo hữu khác đang online trong chùa",
       });
     }
 
@@ -1328,14 +1468,14 @@ io.on("connection", (socket: Socket) => {
     const player = players.get(socket.id);
     if (!player) return;
 
-    const newName = (data.name || "").trim().slice(0, 30);
+    const newName = (data.name || "").trim().slice(0, 30).replace(/\s*#\d+$/, "").trim();
     if (!newName) return;
 
     const oldName = player.name;
     if (oldName === newName) return;
 
     // KIỂM TRA TRÙNG TÊN: Tuyệt đối không cho phép trùng tên với người khác!
-    if (isNameAlreadyTaken(newName, socket.id)) {
+    if (isNameAlreadyTaken(newName, socket.id, player.clientToken)) {
       socket.emit("player:rename_failed", {
         name: newName,
         reason: `Tên "${newName}" đã có đạo hữu khác sử dụng trong chùa! Vui lòng chọn một tên khác.`,
@@ -1438,13 +1578,14 @@ io.on("connection", (socket: Socket) => {
       cleanName = "Thích " + cleanName.substring(5).trim();
     }
 
-    // Đảm bảo pháp danh xuất gia không bị trùng lặp
-    if (isNameAlreadyTaken(cleanName, socket.id)) {
-      cleanName = getGuaranteedUniqueName(cleanName, socket.id);
-    }
-
     const player = players.get(socket.id);
     const oldName = player?.name || "Đạo hữu";
+
+    // Đảm bảo pháp danh xuất gia không bị trùng lặp
+    cleanName = cleanName.replace(/\s*#\d+$/, "").trim();
+    if (isNameAlreadyTaken(cleanName, socket.id, player?.clientToken)) {
+      cleanName = getGuaranteedUniqueName(cleanName, socket.id, player?.clientToken);
+    }
 
     if (player) {
       player.name = cleanName;

@@ -67,6 +67,19 @@ export interface OccupiedSeatEntry {
   socketId: string;
 }
 
+export function getClientSessionToken(): string {
+  try {
+    let token = localStorage.getItem("chua_client_token");
+    if (!token) {
+      token = "clt_" + Math.random().toString(36).substring(2, 10) + "_" + Date.now();
+      localStorage.setItem("chua_client_token", token);
+    }
+    return token;
+  } catch {
+    return "clt_temp_" + Math.random().toString(36).substring(2, 10);
+  }
+}
+
 export class NetworkService {
   private static instance: NetworkService;
   public socket: Socket | null = null;
@@ -76,7 +89,16 @@ export class NetworkService {
   public latestLeaderboard: LeaderboardPayload;
   public roomCount: { current: number; max?: number } = { current: 1 };
   public occupiedSeats: Map<string, { playerName: string; socketId: string }> = new Map();
-  private pendingJoin?: { name: string; avatar: string; gx: number; gy: number; isMonk?: boolean; isLoggedIn?: boolean; camLoToday?: number };
+  private pendingJoin?: {
+    name: string;
+    avatar: string;
+    gx: number;
+    gy: number;
+    isMonk?: boolean;
+    isLoggedIn?: boolean;
+    camLoToday?: number;
+    clientToken?: string;
+  };
 
   private onPlayerJoinedCb?: (player: RemotePlayer) => void;
   private onPlayerMovedCb?: (data: { id: string; gx: number; gy: number; action: string; dir: "left" | "right" }) => void;
@@ -156,6 +178,7 @@ export class NetworkService {
         this.playerId = this.socket?.id || "player_" + Math.floor(Math.random() * 1000);
         console.log("🌸 Kết nối máy chủ Chùa An Lạc thành công. Socket ID:", this.playerId);
         if (this.pendingJoin && this.socket) {
+          this.pendingJoin.clientToken = getClientSessionToken();
           this.socket.emit("player:join", this.pendingJoin);
         }
         if (this.socket) {
@@ -282,7 +305,9 @@ export class NetworkService {
   }
 
   public joinWorld(name: string, avatar: string, gx: number, gy: number, isMonk?: boolean, isLoggedIn?: boolean, camLoToday?: number) {
-    this.pendingJoin = { name, avatar, gx, gy, isMonk, isLoggedIn, camLoToday };
+    const cleanName = (name || "").replace(/\s*#\d+$/, "").trim();
+    const clientToken = getClientSessionToken();
+    this.pendingJoin = { name: cleanName, avatar, gx, gy, isMonk, isLoggedIn, camLoToday, clientToken };
     if (this.socket && this.isConnected) {
       this.socket.emit("player:join", this.pendingJoin);
     }
@@ -301,28 +326,29 @@ export class NetworkService {
   }
 
   public sendRename(name: string) {
-    const oldName = localStorage.getItem("chua_an_lac_player_name") || "";
+    const cleanName = (name || "").replace(/\s*#\d+$/, "").trim();
+    const oldName = (localStorage.getItem("chua_an_lac_player_name") || "").replace(/\s*#\d+$/, "").trim();
     if (this.latestLeaderboard) {
       if (
         this.latestLeaderboard.currentAbbot &&
         (this.latestLeaderboard.currentAbbot.name === oldName ||
           this.latestLeaderboard.currentAbbot.name === this.currentAbbot?.name)
       ) {
-        this.latestLeaderboard.currentAbbot.name = name;
-        if (this.currentAbbot) this.currentAbbot.name = name;
+        this.latestLeaderboard.currentAbbot.name = cleanName;
+        if (this.currentAbbot) this.currentAbbot.name = cleanName;
       }
       if (Array.isArray(this.latestLeaderboard.seniorMonks)) {
         this.latestLeaderboard.seniorMonks.forEach((m) => {
-          if (m.name === oldName) m.name = name;
+          if (m.name === oldName) m.name = cleanName;
         });
       }
       if (Array.isArray(this.latestLeaderboard.leaderboard)) {
         const entry = this.latestLeaderboard.leaderboard.find((e) => e.name === oldName);
-        if (entry) entry.name = name;
+        if (entry) entry.name = cleanName;
       }
     }
     if (this.socket && this.isConnected) {
-      this.socket.emit("player:rename", { name });
+      this.socket.emit("player:rename", { name: cleanName });
     }
   }
 
@@ -434,7 +460,7 @@ export class NetworkService {
       if (!this.socket || !this.isConnected) {
         // Chế độ Offline/Solo: cho phép ngồi
         this.occupiedSeats.set(seatId, {
-          playerName: localStorage.getItem("chua_an_lac_player_name") || "Đạo Hữu",
+          playerName: (localStorage.getItem("chua_an_lac_player_name") || "Đạo Hữu").replace(/\s*#\d+$/, "").trim(),
           socketId: "local_self",
         });
         resolve({ success: true });
@@ -499,7 +525,7 @@ export class NetworkService {
 
   // Quản lý Đơn Cúng Dường Hòm Công Đức (VietQR)
   public async createDonationOrder(packageId: string, playerName?: string): Promise<any> {
-    const name = playerName || localStorage.getItem("chua_an_lac_player_name") || "Đạo Hữu";
+    const name = (playerName || localStorage.getItem("chua_an_lac_player_name") || "Đạo Hữu").replace(/\s*#\d+$/, "").trim();
     if (this.socket && this.isConnected) {
       return new Promise((resolve) => {
         this.socket!.emit("donation:create", { playerName: name, packageId }, (res: any) => {

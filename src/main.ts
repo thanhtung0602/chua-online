@@ -189,12 +189,18 @@ class ChuaAnLacGame {
     // Nhân vật chính Chibi:
     let initialPlayerName: string;
     if (authService.isLoggedIn()) {
-      const savedCustomName = localStorage.getItem("chua_an_lac_player_name") || "";
+      let savedCustomName = (localStorage.getItem("chua_an_lac_player_name") || "").replace(/\s*#\d+$/, "").trim();
+      let dharma = (authService.getDharmaName() || "").replace(/\s*#\d+$/, "").trim();
+      let userName = (authService.getCurrentUser()?.name || "").replace(/\s*#\d+$/, "").trim();
       initialPlayerName =
-        authService.getDharmaName() ||
+        dharma ||
         (savedCustomName && savedCustomName !== "Đạo Hữu An Nhiên" ? savedCustomName : "") ||
-        authService.getCurrentUser()?.name ||
+        userName ||
         "Đạo Hữu";
+      try {
+        localStorage.setItem("chua_an_lac_player_name", initialPlayerName);
+        if (dharma) localStorage.setItem("chua_an_lac_dharma_name", dharma);
+      } catch {}
     } else {
       // Khách chưa đăng nhập: Mỗi lần vào lại web luôn tạo mới nhân vật và bắt đầu từ 0 điểm công đức
       initialPlayerName = generateUniqueGuestName();
@@ -1097,9 +1103,15 @@ class ChuaAnLacGame {
     network.onPlayerNameAdjusted((data) => {
       this.player.createNameTag(data.name);
       this.gameUI.setPlayerInfo(data.name, this.player.gender);
+      try {
+        localStorage.setItem("chua_an_lac_player_name", data.name);
+        if (data.name.startsWith("Thích ")) {
+          localStorage.setItem("chua_an_lac_dharma_name", data.name);
+        }
+      } catch {}
       this.gameUI.appendChatMessage(
         "Hệ Thống",
-        `ℹ️ Tên của đạo hữu đã được điều chỉnh thành [${data.name}] để đảm bảo tính duy nhất, không trùng lặp trong chùa! 🙏`,
+        `ℹ️ Tên của đạo hữu đã được đồng bộ: [${data.name}]! 🙏`,
       );
     });
 

@@ -164,7 +164,7 @@ export class GameUI {
   private currentOracleStick: OracleStick | null = null;
   private isShakingOracle: boolean = false;
   public playerName: string = authService.isLoggedIn()
-    ? (authService.getDharmaName() || localStorage.getItem("chua_an_lac_player_name") || authService.getCurrentUser()?.name || "Đạo Hữu")
+    ? (authService.getDharmaName() || (localStorage.getItem("chua_an_lac_player_name") || "").replace(/\s*#\d+$/, "").trim() || authService.getCurrentUser()?.name || "Đạo Hữu")
     : "Đạo Hữu An Nhiên";
   public playerGender: "male" | "female" = "male";
   public latestLeaderboard?: LeaderboardPayload;

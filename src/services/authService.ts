@@ -82,6 +82,14 @@ class AuthService {
           this.currentUser = null;
         } else {
           this.currentUser = parsed;
+          if (this.currentUser) {
+            if (this.currentUser.name) {
+              this.currentUser.name = this.currentUser.name.replace(/\s*#\d+$/, "").trim();
+            }
+            if (this.currentUser.dharmaName) {
+              this.currentUser.dharmaName = this.currentUser.dharmaName.replace(/\s*#\d+$/, "").trim();
+            }
+          }
         }
       }
     } catch (e) {
@@ -119,7 +127,7 @@ class AuthService {
   }
 
   public getDharmaName(): string | undefined {
-    return this.currentUser?.dharmaName;
+    return this.currentUser?.dharmaName?.replace(/\s*#\d+$/, "").trim();
   }
 
   // ─────────────────────────────────────────────
