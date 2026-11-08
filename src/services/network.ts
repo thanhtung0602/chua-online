@@ -117,6 +117,9 @@ export class NetworkService {
   private onSeatOccupiedCb?: (data: OccupiedSeatEntry) => void;
   private onSeatVacatedCb?: (data: { seatId: string }) => void;
   private onDonationCompletedCb?: (data: any) => void;
+  private onQuestSyncFromServerCb?: (data: any) => void;
+  private onPlayerRobeChangedCb?: (data: { id: string; name: string; robeColor: number }) => void;
+  private onPlayerRobeSyncCb?: (data: { robeColor: number }) => void;
 
   private constructor() {
     this.latestLeaderboard = this.getFallbackLeaderboard();
@@ -298,6 +301,21 @@ export class NetworkService {
       // Lắng nghe thông báo hoàn tất cúng dường Tam Bảo
       this.socket.on("donation:completed", (data: any) => {
         if (this.onDonationCompletedCb) this.onDonationCompletedCb(data);
+      });
+
+      // Lắng nghe đồng bộ tiến trình công quả từ DB Cloud
+      this.socket.on("quest:sync_from_server", (data: any) => {
+        if (this.onQuestSyncFromServerCb) this.onQuestSyncFromServerCb(data);
+      });
+
+      // Lắng nghe thông báo thay đổi màu áo cà sa
+      this.socket.on("player:robe_changed", (data: { id: string; name: string; robeColor: number }) => {
+        if (this.onPlayerRobeChangedCb) this.onPlayerRobeChangedCb(data);
+      });
+
+      // Lắng nghe đồng bộ màu áo cá nhân từ DB
+      this.socket.on("player:robe_sync", (data: { robeColor: number }) => {
+        if (this.onPlayerRobeSyncCb) this.onPlayerRobeSyncCb(data);
       });
     } catch {
       this.isConnected = false;
@@ -593,6 +611,30 @@ export class NetworkService {
 
   public onDonationCompleted(cb: (data: any) => void) {
     this.onDonationCompletedCb = cb;
+  }
+
+  public sendQuestUpdate(state: any) {
+    if (this.socket && this.isConnected) {
+      this.socket.emit("quest:update", state);
+    }
+  }
+
+  public sendRobeChange(robeColor: number) {
+    if (this.socket && this.isConnected) {
+      this.socket.emit("player:robe_change", { robeColor });
+    }
+  }
+
+  public onQuestSyncFromServer(cb: (data: any) => void) {
+    this.onQuestSyncFromServerCb = cb;
+  }
+
+  public onPlayerRobeChanged(cb: (data: { id: string; name: string; robeColor: number }) => void) {
+    this.onPlayerRobeChangedCb = cb;
+  }
+
+  public onPlayerRobeSync(cb: (data: { robeColor: number }) => void) {
+    this.onPlayerRobeSyncCb = cb;
   }
 }
 

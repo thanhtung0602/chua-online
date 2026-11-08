@@ -1135,6 +1135,29 @@ class ChuaAnLacGame {
       );
     });
 
+    network.onPlayerRobeChanged((data) => {
+      if (data.id === network.playerId) {
+        this.player.setRobeColor(data.robeColor);
+      } else {
+        this.remotePlayers.setPlayerRobe(data.id, data.robeColor);
+      }
+    });
+
+    network.onPlayerRobeSync((data) => {
+      if (data && data.robeColor) {
+        this.player.setRobeColor(data.robeColor);
+      }
+    });
+
+    network.onQuestSyncFromServer((serverQuestState) => {
+      if (serverQuestState) {
+        templeQuestManager.applyRemoteState(serverQuestState);
+        this.questZones.updateActiveQuest(templeQuestManager.getActiveQuest(), templeQuestManager.isWorkDone());
+        this.gameUI.renderQuestUI();
+        this.gameUI.updateFloatingQuestTracker();
+      }
+    });
+
     network.onChatBubble((data) => {
       if (data.id === network.playerId) {
         // Local speech bubble already shown

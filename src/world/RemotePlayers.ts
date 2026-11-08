@@ -69,7 +69,7 @@ export class RemotePlayersManager {
     });
   }
 
-  public addPlayer(id: string, name: string, avatar: string, x: number, z: number): RemotePlayerEntity {
+  public addPlayer(id: string, name: string, avatar: string, x: number, z: number, overrideRobeColor?: number): RemotePlayerEntity {
     if (this.players.has(id)) return this.players.get(id)!;
 
     const group = new THREE.Group();
@@ -80,7 +80,7 @@ export class RemotePlayersManager {
 
     let robeColor = isFemale ? 0xc45c7b : 0x8b5a2b; // Nữ: hồng sen tịnh độ / Nam: áo nâu sồng hoặc lam
     if (avatar === "chibi_gray" || avatar === "chibi_blue") robeColor = 0x5b7aa6;
-    else if (isMonk) robeColor = 0xd97706; // Vàng nghệ Cà Sa trang nghiêm cho Tăng Ni xuất gia
+    else if (isMonk) robeColor = overrideRobeColor || 0xd97706; // Vàng nghệ Cà Sa trang nghiêm cho Tăng Ni xuất gia
 
     const skinMat = new THREE.MeshStandardMaterial({ color: 0xffe8d6, roughness: 0.65 });
     const robeMat = new THREE.MeshStandardMaterial({ color: robeColor, roughness: 0.55 });
@@ -462,12 +462,21 @@ export class RemotePlayersManager {
     newEntity.targetPos.copy(currentPos);
   }
 
-  public setPlayerMonk(id: string, dharmaName: string, _robeColor?: number) {
+  public setPlayerMonk(id: string, dharmaName: string, robeColor?: number) {
     const p = this.players.get(id);
     if (!p) return;
     const currentPos = p.group.position.clone();
     this.removePlayer(id);
-    const newEntity = this.addPlayer(id, dharmaName, "chibi_monk", currentPos.x, currentPos.z);
+    const newEntity = this.addPlayer(id, dharmaName, "chibi_monk", currentPos.x, currentPos.z, robeColor);
+    newEntity.targetPos.copy(currentPos);
+  }
+
+  public setPlayerRobe(id: string, robeColor: number) {
+    const p = this.players.get(id);
+    if (!p) return;
+    const currentPos = p.group.position.clone();
+    this.removePlayer(id);
+    const newEntity = this.addPlayer(id, p.name, "chibi_monk", currentPos.x, currentPos.z, robeColor);
     newEntity.targetPos.copy(currentPos);
   }
 

@@ -11,6 +11,8 @@
  */
 
 import { getVietnamDateString } from "./dailyActivities";
+import { network } from "../services/network";
+import { authService } from "../services/authService";
 
 export interface TempleQuest {
   id: string;
@@ -212,12 +214,48 @@ export class TempleQuestManager {
     return freshState;
   }
 
-  public saveState(state: DailyQuestState) {
+  public saveState(state: DailyQuestState, syncToNetwork: boolean = true) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
       console.warn("⚠️ Không thể lưu quest state:", e);
     }
+
+    if (syncToNetwork && authService.isLoggedIn()) {
+      try {
+        network.sendQuestUpdate(state);
+      } catch (e) {
+        console.warn("⚠️ Không thể đồng bộ quest lên server:", e);
+      }
+    }
+  }
+
+  /**
+   * Đồng bộ dữ liệu công quả từ MongoDB Atlas Cloud về client
+   */
+  public applyRemoteState(remote: Partial<DailyQuestState>): boolean {
+    if (!remote) return false;
+    const today = getVietnamDateString();
+    if (remote.date && remote.date !== today) return false;
+
+    const current = this.getState();
+    const merged: DailyQuestState = {
+      date: today,
+      completedCount: Math.min(
+        MAX_DAILY_QUESTS,
+        Math.max(current.completedCount || 0, remote.completedCount || 0)
+      ),
+      completedQuestIds: Array.from(
+        new Set([...(current.completedQuestIds || []), ...(remote.completedQuestIds || [])])
+      ),
+      activeQuestId: remote.activeQuestId !== undefined ? remote.activeQuestId : current.activeQuestId,
+      activeQuestWorkDone:
+        remote.activeQuestWorkDone !== undefined ? remote.activeQuestWorkDone : current.activeQuestWorkDone,
+      activeQuestAcceptedAt: remote.activeQuestAcceptedAt || current.activeQuestAcceptedAt || 0,
+    };
+
+    this.saveState(merged, false);
+    return true;
   }
 
   public resetForNewCharacter() {

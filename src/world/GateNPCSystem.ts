@@ -12,6 +12,7 @@ import { SpeechBubbleManager } from "./SpeechBubble";
 import { GameUI } from "../ui/GameUI";
 import { zenAudio } from "../utils/audio";
 import { dailyActivities } from "../utils/dailyActivities";
+import { authService } from "../services/authService";
 
 interface GateNPC {
   id: "annhien" | "hoanhy" | "tritue" | "trigiac" | "tinhtam";
@@ -1825,7 +1826,13 @@ export class GateNPCSystem {
     zenAudio.playSingingBowl(528);
 
     // Lấy câu thoại tiếp theo trong danh sách
-    const quote = npc.dialogues[npc.dialogueIndex];
+    let quote = npc.dialogues[npc.dialogueIndex];
+    if (npc.id === "trigiac") {
+      const isMonk = authService.isMonk() || this.gameUI.playerName.startsWith("Thích ");
+      if (isMonk) {
+        quote = `A Di Đà Phật! Kính chào Thầy [${this.gameUI.playerName}]. Chúc Thầy ngày càng tinh tấn tu tập, thân tâm thường an lạc! Thầy hoan hỷ khoác y Cà Sa tương ứng phẩm vị hiện tại nhé! 🙏`;
+      }
+    }
     npc.dialogueIndex = (npc.dialogueIndex + 1) % npc.dialogues.length;
 
     // Hiển thị Speech Bubble trên đầu chú tiểu

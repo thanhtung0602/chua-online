@@ -844,39 +844,53 @@ export class GameUI {
               </div>
             </div>
 
-            <!-- PHẦN ĐẶT PHÁP DANH -->
-            <div class="modal-section-title" style="margin-top: 10px;">
-              <span>✍️</span> <b>Đặt Pháp Danh Tự Chọn (Bắt buộc mang họ Thích):</b>
-            </div>
-            <div class="dharma-input-wrap" id="dharma-input-wrap">
-              <span class="dharma-prefix">Thích</span>
-              <input
-                type="text"
-                id="input-dharma-subname"
-                class="dharma-subname-input"
-                placeholder="Nhấp vào đây gõ tên tùy ý (ví dụ: Minh Tuệ, Tâm An...)"
-                maxlength="20"
-                value="Tâm An"
-                autocomplete="off"
-                spellcheck="false"
-              />
-              <button type="button" class="btn-clear-dharma-input" id="btn-clear-dharma-input" title="Xóa tên nhanh để gõ lại">✕</button>
-            </div>
-            <div class="dharma-full-preview">
-              <span>Pháp danh chính thức sau khi xuất gia: </span><b id="dharma-preview-text">Thích Tâm An</b>
+            <!-- KHUNG THÔNG BÁO CHO NGƯỜI ĐÃ XUẤT GIA (CHỈ THAY Y CÀ SA, KHÔNG ĐỔI PHÁP DANH) -->
+            <div id="ordination-already-monk-section" class="hidden">
+              <div class="ordination-card-success" style="margin-bottom: 12px; background: rgba(217, 119, 6, 0.12); border: 1px solid rgba(217, 119, 6, 0.35); border-radius: 12px; padding: 12px 16px;">
+                <span class="ord-icon" style="font-size: 28px;">📜</span>
+                <div class="ord-info" style="margin-left: 12px;">
+                  <b style="color: #ffd700; font-size: 15px; letter-spacing: 0.5px;">GIỚI ĐIỆP XUẤT GIA ĐÃ THỌ NHẬN</b>
+                  <p style="margin: 4px 0; color: #fff; font-size: 14px;">Pháp danh hiện tại: <b id="ordination-current-dharma-text" style="color: #f6ad55; font-size: 15px;">Thích ...</b></p>
+                  <p style="margin: 0; font-size: 12px; color: #a1a1aa; line-height: 1.4;">Theo quy chế thiền môn, nghi lễ thế phát thụ giới chỉ thực hiện một lần. Thầy hoan hỷ chọn sắc áo Cà Sa tương ứng phẩm vị hiện tại dưới đây để hoằng pháp độ sanh.</p>
+                </div>
+              </div>
             </div>
 
-            <!-- GỢI Ý PHÁP DANH HAY -->
-            <div class="name-quick-suggestions">
-              <span class="quick-suggest-label">Hoặc nhấp chọn nhanh Pháp Danh gợi ý:</span>
-              <button type="button" class="dharma-suggest-chip" data-sub="Tâm An">Tâm An</button>
-              <button type="button" class="dharma-suggest-chip" data-sub="Thiện Thông">Thiện Thông</button>
-              <button type="button" class="dharma-suggest-chip" data-sub="Minh Tuệ">Minh Tuệ</button>
-              <button type="button" class="dharma-suggest-chip" data-sub="Trí Dũng">Trí Dũng</button>
-              <button type="button" class="dharma-suggest-chip" data-sub="Đạt Ma">Đạt Ma</button>
-              <button type="button" class="dharma-suggest-chip" data-sub="Pháp Hạnh">Pháp Hạnh</button>
-              <button type="button" class="dharma-suggest-chip" data-sub="Chơn Không">Chơn Không</button>
-              <button type="button" class="dharma-suggest-chip" data-sub="Diệu Định">Diệu Định</button>
+            <!-- PHẦN ĐẶT PHÁP DANH (CHỈ DÀNH CHO CƯ SĨ CHƯA XUẤT GIA) -->
+            <div id="ordination-dharma-naming-section">
+              <div class="modal-section-title" style="margin-top: 10px;">
+                <span>✍️</span> <b>Đặt Pháp Danh Tự Chọn (Bắt buộc mang họ Thích):</b>
+              </div>
+              <div class="dharma-input-wrap" id="dharma-input-wrap">
+                <span class="dharma-prefix">Thích</span>
+                <input
+                  type="text"
+                  id="input-dharma-subname"
+                  class="dharma-subname-input"
+                  placeholder="Nhấp vào đây gõ tên tùy ý (ví dụ: Minh Tuệ, Tâm An...)"
+                  maxlength="20"
+                  value="Tâm An"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button type="button" class="btn-clear-dharma-input" id="btn-clear-dharma-input" title="Xóa tên nhanh để gõ lại">✕</button>
+              </div>
+              <div class="dharma-full-preview">
+                <span>Pháp danh chính thức sau khi xuất gia: </span><b id="dharma-preview-text">Thích Tâm An</b>
+              </div>
+
+              <!-- GỢI Ý PHÁP DANH HAY -->
+              <div class="name-quick-suggestions">
+                <span class="quick-suggest-label">Hoặc nhấp chọn nhanh Pháp Danh gợi ý:</span>
+                <button type="button" class="dharma-suggest-chip" data-sub="Tâm An">Tâm An</button>
+                <button type="button" class="dharma-suggest-chip" data-sub="Thiện Thông">Thiện Thông</button>
+                <button type="button" class="dharma-suggest-chip" data-sub="Minh Tuệ">Minh Tuệ</button>
+                <button type="button" class="dharma-suggest-chip" data-sub="Trí Dũng">Trí Dũng</button>
+                <button type="button" class="dharma-suggest-chip" data-sub="Đạt Ma">Đạt Ma</button>
+                <button type="button" class="dharma-suggest-chip" data-sub="Pháp Hạnh">Pháp Hạnh</button>
+                <button type="button" class="dharma-suggest-chip" data-sub="Chơn Không">Chơn Không</button>
+                <button type="button" class="dharma-suggest-chip" data-sub="Diệu Định">Diệu Định</button>
+              </div>
             </div>
 
             <!-- CHỌN SẮC ÁO CÀ SA THEO PHẨM VỊ -->
@@ -2334,8 +2348,46 @@ export class GameUI {
       });
     });
 
-    // Xác nhận Xuất Gia Thụ Giới
+    // Xác nhận Xuất Gia Thụ Giới / Thay Y Cà Sa
     btnConfirmOrdination?.addEventListener("click", () => {
+      const isAlreadyMonk = authService.isMonk() || this.playerName.startsWith("Thích ");
+
+      // TRƯỜNG HỢP 1: ĐÃ XUẤT GIA -> CHỈ ĐƯỢC THAY Y CÀ SA THEO PHẨM VỊ, KHÔNG CHO ĐỔI PHÁP DANH LẠI!
+      if (isAlreadyMonk) {
+        const isAbbot = this.isPlayerAbbot();
+        const isCaoTang = this.isPlayerCaoTang();
+
+        if (this.selectedRobeColor === 0x991b1b && !isAbbot) {
+          alert("👑 Phẩm phục Cà Sa Son Đỏ tôn quý chỉ dành riêng cho Đức Hòa Thượng Trụ Trì! 🙏");
+          return;
+        }
+        if (this.selectedRobeColor === 0x8b5a2b && !isCaoTang) {
+          alert("🔒 Phẩm phục Nâu Sồng Giải Thoát chỉ mở cho 12 Vị Cao Tăng của Chùa! 🙏");
+          return;
+        }
+
+        try {
+          localStorage.setItem("chua_an_lac_robe_color", "0x" + this.selectedRobeColor.toString(16));
+          if (authService.isLoggedIn()) {
+            authService.updateUser({ robeColor: this.selectedRobeColor });
+          }
+          this.callbacks.onChangeRobeColor?.(this.selectedRobeColor);
+          network.sendRobeChange(this.selectedRobeColor);
+
+          hideOrdinationModal();
+          zenAudio.playSingingBowl(528);
+          this.appendChatMessage(
+            "Chùa",
+            `👘 A Di Đà Phật! Thầy [${this.playerName}] đã khoác lên mình tấm y Cà Sa mới trang nghiêm! 🙏`
+          );
+          this.updateAuthUI();
+        } catch (err: any) {
+          alert(err.message || "Có lỗi xảy ra khi thay đổi sắc áo Cà Sa.");
+        }
+        return;
+      }
+
+      // TRƯỜNG HỢP 2: CƯ SĨ LẦN ĐẦU XUẤT GIA THỤ GIỚI
       if (!authService.isLoggedIn()) {
         const wantLogin = confirm(
           "Đạo hữu chưa Đăng Nhập tài khoản Google.\n\n" +
@@ -2365,24 +2417,8 @@ export class GameUI {
         return;
       }
 
-      // Xác định phẩm vị để đảm bảo sắc áo Cà Sa hợp quy chế thiền môn:
-      const isAbbot = !!(
-        this.latestLeaderboard?.currentAbbot &&
-        this.latestLeaderboard.currentAbbot.name === this.playerName
-      );
-      const isCaoTang = isAbbot || !!(
-        (this.latestLeaderboard?.seniorMonks &&
-          this.latestLeaderboard.seniorMonks.some((s) => s.name === this.playerName)) ||
-        (this.latestLeaderboard?.leaderboard &&
-          this.latestLeaderboard.leaderboard.slice(0, 12).some((l) => l.name === this.playerName))
-      );
-
       // Mới xuống tóc tu hành chỉ được mặc Hoàng Y Cà Sa (0xd97706)
-      if (this.selectedRobeColor === 0x991b1b && !isAbbot) {
-        this.selectedRobeColor = 0xd97706;
-      } else if (this.selectedRobeColor === 0x8b5a2b && !isCaoTang) {
-        this.selectedRobeColor = 0xd97706;
-      }
+      this.selectedRobeColor = 0xd97706;
 
       try {
         authService.ordain(fullDharmaName, this.selectedRobeColor);
@@ -2390,6 +2426,7 @@ export class GameUI {
         localStorage.setItem("chua_an_lac_player_name", fullDharmaName);
         localStorage.setItem("chua_an_lac_is_monk", "true");
         localStorage.setItem("chua_an_lac_dharma_name", fullDharmaName);
+        localStorage.setItem("chua_an_lac_robe_color", "0xd97706");
 
         const myNameEl = document.getElementById("my-standing-name");
         if (myNameEl) myNameEl.innerText = fullDharmaName;
@@ -3856,8 +3893,77 @@ export class GameUI {
     modal?.classList.add("hidden");
   }
 
+  public isPlayerAbbot(): boolean {
+    const name = this.playerName.trim().toLowerCase();
+    const cleanName = name.replace(/\s*#\d+$/, "");
+    if (!name) return false;
+
+    if (this.latestLeaderboard?.currentAbbot?.name) {
+      const abbotName = this.latestLeaderboard.currentAbbot.name.trim().toLowerCase().replace(/\s*#\d+$/, "");
+      if (abbotName === cleanName) return true;
+    }
+
+    const monastic = this.latestLeaderboard?.monasticLeaderboard;
+    if (Array.isArray(monastic) && monastic.length > 0) {
+      const topName = monastic[0]?.name?.trim().toLowerCase().replace(/\s*#\d+$/, "");
+      if (topName === cleanName && (monastic[0]?.camLoToday > 0 || monastic[0]?.totalCamLo > 0)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public isPlayerCaoTang(): boolean {
+    if (this.isPlayerAbbot()) return true;
+    const name = this.playerName.trim().toLowerCase();
+    const cleanName = name.replace(/\s*#\d+$/, "");
+    if (!name) return false;
+
+    if (Array.isArray(this.latestLeaderboard?.seniorMonks)) {
+      for (const m of this.latestLeaderboard.seniorMonks) {
+        if (m.name.trim().toLowerCase().replace(/\s*#\d+$/, "") === cleanName) {
+          return true;
+        }
+      }
+    }
+
+    const monastic = this.latestLeaderboard?.monasticLeaderboard;
+    if (Array.isArray(monastic)) {
+      for (let i = 0; i < Math.min(13, monastic.length); i++) {
+        if (monastic[i]?.name?.trim().toLowerCase().replace(/\s*#\d+$/, "") === cleanName) {
+          return true;
+        }
+      }
+    }
+
+    const all = this.latestLeaderboard?.leaderboard;
+    if (Array.isArray(all)) {
+      for (let i = 0; i < Math.min(12, all.length); i++) {
+        if (all[i]?.name?.trim().toLowerCase().replace(/\s*#\d+$/, "") === cleanName) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  public updateOrdainButtonStatus() {
+    const btn = document.getElementById("btn-hall-ordain");
+    if (!btn) return;
+    const isMonk = authService.isMonk() || this.playerName.startsWith("Thích ");
+    if (isMonk) {
+      btn.innerText = "👘 Thay Y Cà Sa";
+      btn.title = "Thay đổi sắc áo Cà Sa hoằng pháp";
+    } else {
+      btn.innerText = "🪒 Xuất Gia Đi Tu";
+      btn.title = "Gặp Hòa Thượng Thích Trí Giác để Xuống Tóc Đi Tu";
+    }
+  }
+
   public openOrdinationModal() {
-    if (!authService.isLoggedIn()) {
+    const isMonk = authService.isMonk() || this.playerName.startsWith("Thích ");
+
+    if (!isMonk && !authService.isLoggedIn()) {
       const wantLogin = confirm(
         "Đạo hữu chưa Đăng Nhập tài khoản Google.\n\n" +
         "👉 Bấm 'OK' để mở khung Đăng Nhập (khuyên dùng để lưu danh vào Giới Điệp Tam Bảo lâu dài).\n" +
@@ -3868,38 +3974,41 @@ export class GameUI {
         return;
       }
     }
-    const isMonk = authService.isMonk();
+
     const modal = document.getElementById("modal-ordination");
     modal?.classList.remove("hidden");
 
-    // Tiêu đề và nút xác nhận linh hoạt theo trạng thái của đạo hữu
+    const namingSection = document.getElementById("ordination-dharma-naming-section");
+    const alreadyMonkSection = document.getElementById("ordination-already-monk-section");
+    const currentDharmaText = document.getElementById("ordination-current-dharma-text");
     const modalTitle = modal?.querySelector(".modal-header h3") as HTMLElement | null;
+    const bannerIcon = modal?.querySelector(".ordination-icon") as HTMLElement | null;
+    const bannerTitle = modal?.querySelector(".ordination-banner-text b") as HTMLElement | null;
+    const bannerSubtitle = modal?.querySelector(".ordination-banner-text p") as HTMLElement | null;
     const btnConfirm = document.getElementById("btn-confirm-ordination");
+
     if (isMonk) {
-      if (modalTitle) modalTitle.innerText = "🪷 Nghi Lễ Xuất Gia Thụ Giới — Tu Chỉnh Pháp Danh & Cà Sa";
-      if (btnConfirm) btnConfirm.innerHTML = "🙏 Lưu Pháp Danh & Sắc Áo Cà Sa";
+      if (namingSection) namingSection.classList.add("hidden");
+      if (alreadyMonkSection) alreadyMonkSection.classList.remove("hidden");
+      if (currentDharmaText) currentDharmaText.innerText = this.playerName;
+      if (modalTitle) modalTitle.innerText = "👘 Phẩm Phục Cà Sa — Thay Đổi Sắc Áo Tu Hành";
+      if (bannerIcon) bannerIcon.innerText = "👘🪷";
+      if (bannerTitle) bannerTitle.innerText = "Phẩm Phục Cà Sa Chốn Thiền Môn";
+      if (bannerSubtitle) bannerSubtitle.innerText = "Thay đổi sắc y phục tương ứng phẩm vị tu tập của Thầy";
+      if (btnConfirm) btnConfirm.innerHTML = "🙏 Khoác Sắc Áo Này";
     } else {
+      if (namingSection) namingSection.classList.remove("hidden");
+      if (alreadyMonkSection) alreadyMonkSection.classList.add("hidden");
       if (modalTitle) modalTitle.innerText = "🪷 Nghi Lễ Xuất Gia Thụ Giới — Xuống Tóc Đi Tu";
+      if (bannerIcon) bannerIcon.innerText = "✂️🪷";
+      if (bannerTitle) bannerTitle.innerText = "Đại Hùng Bảo Điện • Thế Phát Thụ Giới";
+      if (bannerSubtitle) bannerSubtitle.innerText = "Cắt đứt ngàn sợi phiền não, khoác áo hoằng pháp Tam Bảo";
       if (btnConfirm) btnConfirm.innerHTML = "🙏 Thành Tâm Xuống Tóc Đi Tu";
     }
 
     // Xác định phẩm vị để mở khóa màu áo Cà Sa
-    const isAbbot = !!(
-      (this.latestLeaderboard?.currentAbbot &&
-        this.latestLeaderboard.currentAbbot.name === this.playerName) ||
-      (this.latestLeaderboard?.monasticLeaderboard &&
-        this.latestLeaderboard.monasticLeaderboard.length > 0 &&
-        this.latestLeaderboard.monasticLeaderboard[0]?.name === this.playerName &&
-        this.latestLeaderboard.monasticLeaderboard[0]?.camLoToday > 0)
-    );
-    const isCaoTang = isAbbot || !!(
-      (this.latestLeaderboard?.seniorMonks &&
-        this.latestLeaderboard.seniorMonks.some((s) => s.name === this.playerName)) ||
-      (this.latestLeaderboard?.monasticLeaderboard &&
-        this.latestLeaderboard.monasticLeaderboard.slice(0, 13).some((l) => l.name === this.playerName)) ||
-      (this.latestLeaderboard?.leaderboard &&
-        this.latestLeaderboard.leaderboard.slice(0, 12).some((l) => l.name === this.playerName))
-    );
+    const isAbbot = this.isPlayerAbbot();
+    const isCaoTang = this.isPlayerCaoTang();
 
     const cardYellow = document.getElementById("robe-choice-yellow");
     const cardBrown = document.getElementById("robe-choice-brown");
@@ -3907,14 +4016,10 @@ export class GameUI {
     const brownTag = document.getElementById("robe-brown-tag");
     const redTag = document.getElementById("robe-red-tag");
 
-    // 1. Hoàng Y Cà Sa (Vàng nghệ): Luôn mở và mặc định được chọn cho người mới xuất gia
+    // 1. Hoàng Y Cà Sa (Vàng nghệ): Luôn mở cho mọi Tăng chúng
     cardYellow?.classList.remove("locked");
-    cardYellow?.classList.add("active");
-    cardBrown?.classList.remove("active");
-    cardRed?.classList.remove("active");
-    this.selectedRobeColor = 0xd97706;
 
-    // 2. Nâu Sồng Giải Thoát (Nâu): Chỉ mở cho Cao Tăng (Top 12 Bảng Vàng)
+    // 2. Nâu Sồng Giải Thoát (Nâu): Chỉ mở cho Cao Tăng (Top 12) hoặc Trụ Trì
     if (isCaoTang) {
       cardBrown?.classList.remove("locked");
       if (brownTag) {
@@ -3929,7 +4034,7 @@ export class GameUI {
       }
     }
 
-    // 3. Cà Sa Son Đỏ (Đỏ): Chỉ mở cho Trụ Trì
+    // 3. Cà Sa Son Đỏ (Đỏ): Chỉ mở cho Đương Kim Hòa Thượng Trụ Trì
     if (isAbbot) {
       cardRed?.classList.remove("locked");
       if (redTag) {
@@ -3940,13 +4045,38 @@ export class GameUI {
       cardRed?.classList.add("locked");
       if (redTag) {
         redTag.className = "robe-lock-tag tag-locked";
-        redTag.innerText = "👑 Chỉ Mở Cho Trụ Trì";
+        redTag.innerText = "👑 Chỉ Dành Cho Trụ Trì";
       }
+    }
+
+    // Giữ nguyên sắc áo Cà Sa hiện tại người chơi đang mặc thay vì ép về màu vàng
+    let currentRobe = 0xd97706;
+    const savedRobe = localStorage.getItem("chua_an_lac_robe_color");
+    if (savedRobe) {
+      const parsed = parseInt(savedRobe.replace("0x", ""), 16);
+      if (!isNaN(parsed) && parsed > 0) currentRobe = parsed;
+    } else if (authService.getCurrentUser()?.robeColor) {
+      currentRobe = authService.getCurrentUser()!.robeColor!;
+    }
+
+    cardYellow?.classList.remove("active");
+    cardBrown?.classList.remove("active");
+    cardRed?.classList.remove("active");
+
+    if (currentRobe === 0x991b1b && isAbbot) {
+      cardRed?.classList.add("active");
+      this.selectedRobeColor = 0x991b1b;
+    } else if (currentRobe === 0x8b5a2b && isCaoTang) {
+      cardBrown?.classList.add("active");
+      this.selectedRobeColor = 0x8b5a2b;
+    } else {
+      cardYellow?.classList.add("active");
+      this.selectedRobeColor = 0xd97706;
     }
 
     const subInput = document.getElementById("input-dharma-subname") as HTMLInputElement | null;
     const dharmaPreviewText = document.getElementById("dharma-preview-text");
-    if (subInput && dharmaPreviewText) {
+    if (subInput && dharmaPreviewText && !isMonk) {
       let defaultSub = this.playerName.replace(/^(Thích\s*)+/i, "").trim();
       if (!defaultSub || defaultSub.toLowerCase().includes("đạo hữu")) {
         defaultSub = "Tâm An";
@@ -4064,6 +4194,8 @@ export class GameUI {
       if (loggedView) loggedView.classList.add("hidden");
       if (btnLogout) btnLogout.classList.add("hidden");
     }
+
+    this.updateOrdainButtonStatus();
   }
 
   // ─────────────────────────────────────────────

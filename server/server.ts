@@ -42,12 +42,19 @@ const PlayerProfileSchema = new mongoose.Schema(
     avatar: String,
     isMonk: Boolean,
     dharmaName: String,
+    robeColor: { type: Number, default: 0xd97706 },
     clientToken: { type: String, index: true },
     camLoToday: { type: Number, default: 0 },
     totalCamLo: { type: Number, default: 0 },
     totalDonated: { type: Number, default: 0 },
     donationCount: { type: Number, default: 0 },
     lastDate: String,
+    // Tiến trình nhiệm vụ công quả hàng ngày
+    questsCompletedToday: { type: Number, default: 0 },
+    completedQuestIds: { type: [String], default: [] },
+    activeQuestId: { type: String, default: null },
+    activeQuestWorkDone: { type: Boolean, default: false },
+    questDate: String,
   },
   { timestamps: true }
 );
@@ -289,6 +296,7 @@ interface PlayerState {
   dir: "left" | "right";
   isLoggedIn?: boolean;
   isMonk?: boolean;
+  robeColor?: number;
   clientToken?: string;
 }
 
@@ -1302,6 +1310,23 @@ io.on("connection", (socket: Socket) => {
               saveLeaderboardData();
               broadcastLeaderboard();
             }
+
+            // Đồng bộ dữ liệu công quả đã lưu từ MongoDB Atlas về máy người chơi
+            const isSameQuestDay = profile.questDate === todayStr;
+            const questData = {
+              date: todayStr,
+              completedCount: isSameQuestDay ? Math.min(10, Math.max(0, profile.questsCompletedToday || 0)) : 0,
+              completedQuestIds: isSameQuestDay && Array.isArray(profile.completedQuestIds) ? profile.completedQuestIds : [],
+              activeQuestId: isSameQuestDay ? (profile.activeQuestId || null) : null,
+              activeQuestWorkDone: isSameQuestDay ? Boolean(profile.activeQuestWorkDone) : false,
+            };
+            socket.emit("quest:sync_from_server", questData);
+
+            // Đồng bộ màu áo cà sa từ DB
+            if (profile.robeColor) {
+              player.robeColor = profile.robeColor;
+              socket.emit("player:robe_sync", { robeColor: profile.robeColor });
+            }
           }
         }).catch(() => {});
       }
@@ -1675,6 +1700,62 @@ io.on("connection", (socket: Socket) => {
       id: "system",
       text: `🔔 [XUẤT GIA THỤ GIỚI] Đạo hữu ${oldName} đã chính thức xả bỏ thế tục, xuống tóc quy y và mang pháp danh [${cleanName}]. Kính chúc tân tăng thân tâm an lạc, sớm đắc quả vị! 🙏`,
     });
+  });
+
+  // 3.3. Thay đổi sắc y phục Cà Sa (Dành cho Tăng Ni đã xuất gia theo đúng phẩm vị)
+  socket.on("player:robe_change", async (data: { robeColor: number }) => {
+    const player = players.get(socket.id);
+    if (!player) return;
+    const robeColor = Number(data.robeColor) || 0xd97706;
+    player.robeColor = robeColor;
+
+    if (isMongoConnected) {
+      try {
+        await PlayerProfileModel.updateOne(
+          { name: player.name },
+          { $set: { robeColor } }
+        );
+      } catch (e) {
+        console.warn("⚠️ Lỗi lưu robeColor vào MongoDB:", e);
+      }
+    }
+
+    io.emit("player:robe_changed", {
+      id: socket.id,
+      name: player.name,
+      robeColor,
+    });
+  });
+
+  // 3.4. Lưu và đồng bộ tiến trình công quả thiền môn lên MongoDB Atlas
+  socket.on("quest:update", async (data: any) => {
+    const player = players.get(socket.id);
+    if (!player || !player.isLoggedIn) return;
+    const todayStr = getVietnamDateString();
+    const completedCount = Math.min(10, Math.max(0, Number(data.completedCount) || 0));
+    const completedQuestIds = Array.isArray(data.completedQuestIds) ? data.completedQuestIds : [];
+    const activeQuestId = data.activeQuestId || null;
+    const activeQuestWorkDone = Boolean(data.activeQuestWorkDone);
+
+    if (isMongoConnected) {
+      try {
+        await PlayerProfileModel.updateOne(
+          { name: player.name },
+          {
+            $set: {
+              questDate: todayStr,
+              questsCompletedToday: completedCount,
+              completedQuestIds,
+              activeQuestId,
+              activeQuestWorkDone,
+            },
+          },
+          { upsert: true }
+        );
+      } catch (err) {
+        console.warn("⚠️ Lỗi lưu tiến trình công quả vào MongoDB:", err);
+      }
+    }
   });
 
   // 4. Chat & Bong bóng thoại
