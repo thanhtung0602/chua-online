@@ -23,7 +23,7 @@ import { GateNPCSystem } from "./world/GateNPCSystem";
 import { QuestZoneSystem } from "./world/QuestZoneSystem";
 import { network } from "./services/network";
 import { zenAudio } from "./utils/audio";
-import { dailyActivities } from "./utils/dailyActivities";
+import { dailyActivities, saveMeritPoints } from "./utils/dailyActivities";
 import { GameUI } from "./ui/GameUI";
 import { generateUniqueGuestName } from "./utils/nameGenerator";
 import { authService } from "./services/authService";
@@ -194,15 +194,16 @@ class ChuaAnLacGame {
         authService.getCurrentUser()?.name ||
         "Đạo Hữu";
     } else {
-      const savedGuest = localStorage.getItem("chua_an_lac_player_name");
-      if (savedGuest && savedGuest.trim()) {
-        initialPlayerName = savedGuest.trim();
-      } else {
-        initialPlayerName = generateUniqueGuestName();
-        try {
-          localStorage.setItem("chua_an_lac_player_name", initialPlayerName);
-        } catch {}
-      }
+      // Khách chưa đăng nhập: Mỗi lần vào lại web luôn tạo mới nhân vật và bắt đầu từ 0 điểm công đức
+      initialPlayerName = generateUniqueGuestName();
+      try {
+        localStorage.setItem("chua_an_lac_player_name", initialPlayerName);
+        localStorage.removeItem("chua_an_lac_is_monk");
+        localStorage.removeItem("chua_an_lac_dharma_name");
+      } catch {}
+      saveMeritPoints(initialPlayerName, 0);
+      dailyActivities.resetForNewCharacter();
+      templeQuestManager.resetForNewCharacter();
     }
 
     this.player = new Player(0, 10, initialPlayerName, 0x5b7aa6);
@@ -664,18 +665,13 @@ class ChuaAnLacGame {
         network.sendAction("gender:" + gender);
       },
       onChangePlayerName: (newName: string) => {
-        const wasAbbot = this.player.isAbbot;
-        const currentRank = this.player.seniorRank;
-
         this.player.createNameTag(newName);
-        if (wasAbbot) {
-          this.player.setIsAbbot(true);
-        } else if (currentRank >= 2 && currentRank <= 13) {
-          this.player.setSeniorRank(currentRank);
-        }
+        // Tạo mới nhân vật: Làm mới danh hiệu và bắt đầu lại
+        this.player.setIsAbbot(false);
+        this.player.setSeniorRank(0);
 
         network.sendRename(newName);
-        this.speechBubbles.show(this.player.group, `A Di Đà Phật! Pháp danh mới: ${newName} 🙏`, 4000);
+        this.speechBubbles.show(this.player.group, `A Di Đà Phật! Đạo hữu hóa thân nhân vật mới: ${newName} 🙏`, 4000);
       },
       onChangeRobeColor: (color) => {
         this.player.setRobeColor(color);
@@ -1043,7 +1039,14 @@ class ChuaAnLacGame {
 
   private setupNetworking() {
     const avatarType = this.player.gender === "female" ? "chibi_female" : "chibi_gray";
-    network.joinWorld(this.player.name, avatarType, this.player.worldX, this.player.worldZ);
+    network.joinWorld(
+      this.player.name,
+      avatarType,
+      this.player.worldX,
+      this.player.worldZ,
+      this.player.isMonk || this.player.name.startsWith("Thích "),
+      authService.isLoggedIn()
+    );
 
     network.onPlayerJoined((remote) => {
       this.remotePlayers.addPlayer(remote.id, remote.name, remote.avatar, remote.gx, remote.gy);
@@ -1509,11 +1512,12 @@ class ChuaAnLacGame {
     if (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
     if (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
 
-    const followSpeed = this.player.isMoving ? 0.09 : 0.06;
+    // Tốc độ bám theo êm ái, chậm rãi, hoàn toàn không gây chóng mặt
+    const followSpeed = this.player.isMoving ? 0.025 : 0.015;
     this.cameraYaw += angleDiff * followSpeed;
 
-    this.cameraPitch = THREE.MathUtils.lerp(this.cameraPitch, this.targetPitch, 0.12);
-    this.cameraDistance = THREE.MathUtils.lerp(this.cameraDistance, this.targetDistance, 0.12);
+    this.cameraPitch = THREE.MathUtils.lerp(this.cameraPitch, this.targetPitch, 0.05);
+    this.cameraDistance = THREE.MathUtils.lerp(this.cameraDistance, this.targetDistance, 0.05);
 
     const playerPos = this.player.getPosition();
     const lookTarget = new THREE.Vector3(playerPos.x, playerPos.y + 1.15, playerPos.z);

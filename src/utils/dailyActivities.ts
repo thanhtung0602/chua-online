@@ -107,6 +107,21 @@ export class DailyActivityManager {
     }
   }
 
+  public resetForNewCharacter() {
+    const today = getVietnamDateString();
+    const freshState: DailyActivitiesState = {
+      date: today,
+      hasOfferedIncense: false,
+      hasRungGrandBell: false,
+      hasOfferedFlowers: false,
+      hasReceivedGateBlessing: false,
+      drawnOracleCategories: [],
+      drawnOracleSticks: {},
+      hasRenamedToday: false,
+    };
+    this.saveState(freshState);
+  }
+
   // ─────────────────────────────────────────────
   // 1. DÂNG NÉN TÂM HƯƠNG (1 LẦN/NGÀY)
   // ─────────────────────────────────────────────

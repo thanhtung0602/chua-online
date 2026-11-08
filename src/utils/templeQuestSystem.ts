@@ -220,6 +220,19 @@ export class TempleQuestManager {
     }
   }
 
+  public resetForNewCharacter() {
+    const today = getVietnamDateString();
+    const freshState: DailyQuestState = {
+      date: today,
+      completedCount: 0,
+      activeQuestId: null,
+      activeQuestAcceptedAt: 0,
+      activeQuestWorkDone: false,
+      completedQuestIds: [],
+    };
+    this.saveState(freshState);
+  }
+
   public getAvailableQuests(): TempleQuest[] {
     const state = this.getState();
     // Trả về danh sách nhiệm vụ chưa hoàn thành hôm nay

@@ -24,6 +24,8 @@ interface PlayerState {
   gy: number;
   action: string;
   dir: "left" | "right";
+  isLoggedIn?: boolean;
+  isMonk?: boolean;
 }
 
 interface ServerLantern {
@@ -575,11 +577,12 @@ io.on("connection", (socket: Socket) => {
   });
 
   // 1. Gia nhập thế giới chùa (Không giới hạn người chơi, mỗi người tên duy nhất)
-  socket.on("player:join", (data: { name: string; avatar: string; gx: number; gy: number }) => {
+  socket.on("player:join", (data: { name: string; avatar: string; gx: number; gy: number; isLoggedIn?: boolean; isMonk?: boolean }) => {
     const rawName = (data.name || "Đạo Hữu").trim().slice(0, 30);
     // Bắt buộc tên không được trùng với bất kỳ ai
     const uniqueName = getGuaranteedUniqueName(rawName, socket.id);
     const isPlayerMonk = uniqueName.startsWith("Thích ") || Boolean((data as any).isMonk);
+    const isLoggedIn = Boolean((data as any).isLoggedIn);
 
     const player: PlayerState = {
       id: socket.id,
@@ -589,27 +592,43 @@ io.on("connection", (socket: Socket) => {
       gy: data.gy || 21,
       action: "idle",
       dir: "right",
+      isLoggedIn,
+      isMonk: isPlayerMonk,
     };
-    (player as any).isMonk = isPlayerMonk;
 
     players.set(socket.id, player);
 
-    // Ghi nhận ngay người chơi vào cơ sở dữ liệu nếu chưa có
-    if (!leaderboardState.entries[uniqueName]) {
+    // Xử lý điểm công đức & bảng xếp hạng khi gia nhập:
+    if (!isLoggedIn) {
+      // Khách vãng lai chưa đăng nhập: Luôn reset điểm công đức về 0
       leaderboardState.entries[uniqueName] = {
         name: uniqueName,
         avatar: data.avatar || "female",
         camLoToday: 0,
         totalCamLo: 0,
         lastUpdated: Date.now(),
-        isMonk: isPlayerMonk,
+        isMonk: false,
       };
       saveLeaderboardData();
       broadcastLeaderboard();
-    } else if (isPlayerMonk && !leaderboardState.entries[uniqueName].isMonk) {
-      leaderboardState.entries[uniqueName].isMonk = true;
-      saveLeaderboardData();
-      broadcastLeaderboard();
+    } else {
+      // Người dùng đã đăng nhập: Ghi nhận vào cơ sở dữ liệu nếu chưa có
+      if (!leaderboardState.entries[uniqueName]) {
+        leaderboardState.entries[uniqueName] = {
+          name: uniqueName,
+          avatar: data.avatar || "female",
+          camLoToday: 0,
+          totalCamLo: 0,
+          lastUpdated: Date.now(),
+          isMonk: isPlayerMonk,
+        };
+        saveLeaderboardData();
+        broadcastLeaderboard();
+      } else if (isPlayerMonk && !leaderboardState.entries[uniqueName].isMonk) {
+        leaderboardState.entries[uniqueName].isMonk = true;
+        saveLeaderboardData();
+        broadcastLeaderboard();
+      }
     }
 
     // Cập nhật số người trong phòng cho tất cả đạo hữu
@@ -787,62 +806,30 @@ io.on("connection", (socket: Socket) => {
     player.name = newName;
     socket.emit("player:rename_success", { name: newName });
 
-      let needLeaderboardUpdate = false;
-
-      // 1. Bảo lưu danh hiệu Hòa Thượng Trụ Trì nếu người đổi tên đang giữ ngôi vị Trụ Trì
-      if (leaderboardState.currentAbbot && leaderboardState.currentAbbot.name === oldName) {
-        leaderboardState.currentAbbot.name = newName;
-        console.log(`👑 [SERVER] Bảo lưu danh hiệu Hòa Thượng Trụ Trì khi đổi tên: "${oldName}" -> "${newName}"`);
-        needLeaderboardUpdate = true;
-      }
-
-      // 2. Bảo lưu danh hiệu trong 12 Vị Cao Tăng
-      if (Array.isArray(leaderboardState.seniorMonks)) {
-        for (const monk of leaderboardState.seniorMonks) {
-          if (monk.name === oldName) {
-            monk.name = newName;
-            console.log(`🪷 [SERVER] Bảo lưu danh hiệu Cao Tăng #${monk.rank} khi đổi tên: "${oldName}" -> "${newName}"`);
-            needLeaderboardUpdate = true;
-          }
-        }
-      }
-
-      // 3. Cập nhật lịch sử danh hiệu Trụ Trì
-      if (Array.isArray(leaderboardState.history)) {
-        for (const h of leaderboardState.history) {
-          if (h.winner === oldName) {
-            h.winner = newName;
-          }
-        }
-      }
-
-      // 4. Di chuyển điểm công đức sang pháp danh mới
+      // Đã tạo mới nhân vật: Xóa nhân vật cũ khỏi bảng xếp hạng & reset điểm công đức về 0
       if (oldName !== newName) {
-        if (leaderboardState.entries[oldName]) {
-          const prev = leaderboardState.entries[oldName];
-          delete leaderboardState.entries[oldName];
-          leaderboardState.entries[newName] = {
-            ...prev,
-            name: newName,
-            lastUpdated: Date.now(),
-          };
-          needLeaderboardUpdate = true;
-        } else {
-          leaderboardState.entries[newName] = {
-            name: newName,
-            avatar: player.avatar || "male",
-            camLoToday: 0,
-            totalCamLo: 0,
-            lastUpdated: Date.now(),
-          };
-          needLeaderboardUpdate = true;
+        delete leaderboardState.entries[oldName];
+        if (leaderboardState.currentAbbot && leaderboardState.currentAbbot.name === oldName) {
+          leaderboardState.currentAbbot = null;
+        }
+        if (Array.isArray(leaderboardState.seniorMonks)) {
+          leaderboardState.seniorMonks = leaderboardState.seniorMonks.filter((m) => m.name !== oldName);
         }
       }
 
-      if (needLeaderboardUpdate) {
-        saveLeaderboardData();
-        broadcastLeaderboard();
-      }
+      // Tạo mới nhân vật với 0 điểm công đức
+      const isMonk = newName.startsWith("Thích ");
+      leaderboardState.entries[newName] = {
+        name: newName,
+        avatar: player.avatar || "male",
+        camLoToday: 0,
+        totalCamLo: 0,
+        lastUpdated: Date.now(),
+        isMonk,
+      };
+
+      saveLeaderboardData();
+      broadcastLeaderboard();
 
       socket.broadcast.emit("player:renamed", {
         id: socket.id,
@@ -968,6 +955,13 @@ io.on("connection", (socket: Socket) => {
   // 7. Rời mạng
   socket.on("disconnect", () => {
     console.log(`🍃 Đạo hữu rời bước: ${socket.id}`);
+    const player = players.get(socket.id);
+    if (player && !player.isLoggedIn) {
+      // Khách chưa đăng nhập: Dọn dẹp khỏi bảng xếp hạng khi rời mạng
+      delete leaderboardState.entries[player.name];
+      saveLeaderboardData();
+      broadcastLeaderboard();
+    }
     players.delete(socket.id);
 
     // Giải phóng chỗ ngồi trong Chính Điện nếu socket này đang ngồi

@@ -131,6 +131,12 @@ export class GameUI {
   }
 
   private initMeritPoints() {
+    if (!authService.isLoggedIn()) {
+      // Khách chưa đăng nhập: Luôn bắt đầu từ 0 điểm công đức
+      saveMeritPoints(this.playerName, 0);
+      this.setMeritPoints(0);
+      return;
+    }
     const saved = getSavedMeritPoints(this.playerName);
     this.setMeritPoints(saved);
   }
@@ -1518,13 +1524,25 @@ export class GameUI {
       if (isMonk) {
         localStorage.setItem("chua_an_lac_dharma_name", raw);
       }
+
+      // Đã tạo mới nhân vật: Làm mới điểm công đức và nhiệm vụ về 0
+      this.setMeritPoints(0);
+      saveMeritPoints(raw, 0);
+      dailyActivities.resetForNewCharacter();
+      templeQuestManager.resetForNewCharacter();
+
       this.callbacks.onChangePlayerName?.(raw);
       const myNameEl = document.getElementById("my-standing-name");
       if (myNameEl) myNameEl.innerText = raw;
+      const myDropsEl = document.getElementById("my-standing-drops");
+      if (myDropsEl) myDropsEl.innerText = "0";
+      const myRankEl = document.getElementById("my-standing-rank");
+      if (myRankEl) myRankEl.innerText = "Chưa có điểm hôm nay";
+
       zenAudio.playLotusSound();
       this.appendChatMessage(
         "Hệ Thống",
-        `✨ Đạo hữu vừa đổi pháp danh thành: [${raw}]. Danh hiệu tu tập (Trụ Trì / Cao Tăng) được bảo lưu trọn vẹn! 🙏`,
+        `✨ Đạo hữu vừa tạo mới nhân vật: [${raw}]. Điểm công đức và bảng xếp hạng đã được làm mới về 0! 🙏`,
       );
       this.updateRenameUIStatus();
     };
@@ -3133,9 +3151,7 @@ export class GameUI {
           }
         }
         if (myDropsEl) myDropsEl.innerText = entry.camLoToday.toLocaleString();
-        const curDisplay = this.getMeritPoints();
-        const finalPoints = Math.max(curDisplay, entry.camLoToday);
-        this.setMeritPoints(finalPoints);
+        this.setMeritPoints(entry.camLoToday);
       } else {
         if (myRankEl) myRankEl.innerText = "🪷 Tăng Đoàn: Chưa có điểm hôm nay";
         const curCounter = this.getMeritPoints();
@@ -3160,9 +3176,7 @@ export class GameUI {
           }
         }
         if (myDropsEl) myDropsEl.innerText = entry.camLoToday.toLocaleString();
-        const curDisplay = this.getMeritPoints();
-        const finalPoints = Math.max(curDisplay, entry.camLoToday);
-        this.setMeritPoints(finalPoints);
+        this.setMeritPoints(entry.camLoToday);
       } else {
         if (myRankEl) myRankEl.innerText = "🌸 Cư Sĩ: Chưa có điểm hôm nay";
         const curCounter = this.getMeritPoints();

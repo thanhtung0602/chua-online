@@ -2,15 +2,6 @@
   "currentDate": "2026-11-08",
   "currentAbbot": null,
   "seniorMonks": [],
-  "entries": {
-    "Thích Lê Thanh Tùng": {
-      "name": "Thích Lê Thanh Tùng",
-      "avatar": "male",
-      "camLoToday": 45,
-      "totalCamLo": 45,
-      "lastUpdated": 1794133871670,
-      "isMonk": true
-    }
-  },
+  "entries": {},
   "history": []
 }
