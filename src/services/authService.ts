@@ -259,24 +259,42 @@ class AuthService {
     });
   }
 
-  public loadFacebookSDK(appId: string): Promise<void> {
+  public loadFacebookSDK(appId?: string): Promise<void> {
     return new Promise((resolve) => {
       if (this.isFacebookSdkLoaded && window.FB) {
         return resolve();
       }
+      if (window.FB) {
+        this.isFacebookSdkLoaded = true;
+        return resolve();
+      }
+      const prevInit = window.fbAsyncInit;
       window.fbAsyncInit = () => {
-        window.FB?.init({
-          appId: appId.trim(),
-          cookie: true,
-          xfbml: true,
-          version: "v21.0",
-        });
+        if (typeof prevInit === "function") prevInit();
+        if (appId && window.FB) {
+          window.FB.init({
+            appId: appId.trim(),
+            cookie: true,
+            xfbml: true,
+            version: "v21.0",
+          });
+        }
         this.isFacebookSdkLoaded = true;
         resolve();
       };
 
       const existing = document.getElementById("facebook-jssdk");
-      if (existing) return;
+      if (existing) {
+        const checkInterval = setInterval(() => {
+          if (window.FB) {
+            clearInterval(checkInterval);
+            this.isFacebookSdkLoaded = true;
+            resolve();
+          }
+        }, 100);
+        setTimeout(() => clearInterval(checkInterval), 4000);
+        return;
+      }
 
       const script = document.createElement("script");
       script.id = "facebook-jssdk";
