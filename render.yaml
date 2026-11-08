@@ -1,0 +1,18 @@
+# Cấu hình tự động triển khai Zero-Downtime trên Render.com
+# Khi bạn push code lên GitHub, Render sẽ tự động build và cập nhật mà không gián đoạn web đang chạy.
+services:
+  - type: web
+    name: chua-an-lac-online
+    env: node
+    plan: free
+    region: singapore # Chọn Singapore để tốc độ truy cập từ Việt Nam cực nhanh
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: APP_VERSION
+        value: 1.0.0
