@@ -18,6 +18,7 @@ export class TempleWorld {
   public buddhaStatues: THREE.Object3D[] = [];
   public altarGroup!: THREE.Group;
   public cushionMeshes: THREE.Object3D[] = [];
+  public donationBoxMeshes: THREE.Object3D[] = [];
   public cushionPositions: {
     x: number;
     y: number;
@@ -91,6 +92,10 @@ export class TempleWorld {
     if (z <= -55.2 && z >= -56.8 && Math.abs(x) <= 28.5) return true;
 
     // 2. Đại Hùng Bảo Điện (Main Sanctuary Hall)
+    // 2 Hòm Công Đức hai bên bục Pháp Tòa (x = ±3.3, z = -31.3):
+    if (z >= -32.0 && z <= -30.6 && (Math.abs(x - 3.3) < 0.6 || Math.abs(x + 3.3) < 0.6)) {
+      return true;
+    }
     // Mặt tiền: tường trước tại z = -13.25, chỉ mở cửa chính giữa tại x in [-7.6, 7.6]
     if (z >= -13.9 && z <= -12.6 && Math.abs(x) >= 7.5 && Math.abs(x) <= 19.8) return true;
 
@@ -2033,6 +2038,11 @@ export class TempleWorld {
     // 10. HỆ THỐNG PHÁP TÒA & BỒ ĐOÀN ĐA TẦNG (TRỤ TRÌ -> CAO TĂNG -> PHẬT TỬ)
     // ==========================================
     this.createTieredSanctuarySeating(group);
+
+    // ==========================================
+    // 10.1. HAI HÒM CÔNG ĐỨC BÊN CẠNH BỤC PHÁP TÒA (CÚNG DƯỜNG TAM BẢO)
+    // ==========================================
+    this.createDonationBoxes(group);
 
     // ==========================================
     // 11. MÁI NGÓI ĐAO CONG 2 TẦNG NGUY NGA (Cao vút, bao phủ trọn vẹn toàn bộ tượng Phật)
@@ -4456,6 +4466,239 @@ export class TempleWorld {
     seatingGroup.add(pistilInst);
 
     parent.add(seatingGroup);
+  }
+
+  /**
+   * Tạo texture bảng đồng sơn son thếp vàng cho Hòm Công Đức
+   */
+  private createDonationBoxSignTexture(): THREE.CanvasTexture {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 256;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      // Nền sơn mài đỏ thắm
+      const grad = ctx.createLinearGradient(0, 0, 512, 256);
+      grad.addColorStop(0, "#4a0c0c");
+      grad.addColorStop(0.5, "#7a1515");
+      grad.addColorStop(1, "#3f0a0a");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 256);
+
+      // Viền kép thếp vàng
+      ctx.strokeStyle = "#d4af37";
+      ctx.lineWidth = 10;
+      ctx.strokeRect(10, 10, 492, 236);
+      ctx.lineWidth = 3;
+      ctx.strokeRect(20, 20, 472, 216);
+
+      // Hoa văn 4 góc
+      ctx.fillStyle = "#ffd700";
+      ctx.font = "bold 22px serif";
+      ctx.fillText("❖", 28, 45);
+      ctx.fillText("❖", 465, 45);
+      ctx.fillText("❖", 28, 225);
+      ctx.fillText("❖", 465, 225);
+
+      // Hoa sen trung tâm
+      ctx.font = "30px serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("🪷", 256, 52);
+
+      // Chữ chính: HÒM CÔNG ĐỨC
+      ctx.fillStyle = "#fff3b0";
+      ctx.shadowColor = "#ffb300";
+      ctx.shadowBlur = 10;
+      ctx.font = "bold 42px 'Cinzel', 'Times New Roman', serif";
+      ctx.fillText("HÒM CÔNG ĐỨC", 256, 115);
+
+      // Dòng phụ: CÚNG DƯỜNG TAM BẢO
+      ctx.shadowBlur = 4;
+      ctx.fillStyle = "#ffd700";
+      ctx.font = "bold 26px 'Times New Roman', serif";
+      ctx.fillText("CÚNG DƯỜNG TAM BẢO", 256, 172);
+
+      // Chân ngôn
+      ctx.fillStyle = "#e0c078";
+      ctx.font = "italic 18px 'Times New Roman', serif";
+      ctx.fillText("Tâm Thành Nguyện Cầu • Phúc Lạc Vô Cùng", 256, 212);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  /**
+   * Thiết kế 2 Hòm Công Đức thếp vàng tôn nghiêm hai bên bục Pháp Tòa trong Chính Điện
+   * Vị trí: x = ±3.3, y = 0.65 (mặt sàn), z = -31.3
+   */
+  private createDonationBoxes(parent: THREE.Group): void {
+    const signTexture = this.createDonationBoxSignTexture();
+
+    // Vật liệu
+    const lacquerRedMat = new THREE.MeshStandardMaterial({
+      color: 0x821515,
+      roughness: 0.35,
+      metalness: 0.15,
+    });
+    const darkWoodMat = new THREE.MeshStandardMaterial({
+      color: 0x36160d,
+      roughness: 0.7,
+      metalness: 0.1,
+    });
+    const goldTrimMat = new THREE.MeshStandardMaterial({
+      color: 0xd4af37,
+      roughness: 0.25,
+      metalness: 0.85,
+    });
+    const darkSlotMat = new THREE.MeshBasicMaterial({ color: 0x050505 });
+    const signMat = new THREE.MeshStandardMaterial({
+      map: signTexture,
+      roughness: 0.3,
+      metalness: 0.3,
+    });
+
+    const boxPositions = [
+      { x: -3.3, z: -31.3, rotY: 0.22, name: "donation_box_left" },
+      { x: 3.3, z: -31.3, rotY: -0.22, name: "donation_box_right" },
+    ];
+
+    boxPositions.forEach((pos) => {
+      const boxGroup = new THREE.Group();
+      boxGroup.position.set(pos.x, 0.65, pos.z);
+      boxGroup.rotation.y = pos.rotY;
+      boxGroup.name = pos.name;
+
+      // 1. Chân đế quỳ dạ cá (Pedestal base)
+      const baseMesh = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.14, 0.72), darkWoodMat);
+      baseMesh.position.y = 0.07;
+      baseMesh.castShadow = true;
+      baseMesh.receiveShadow = true;
+      boxGroup.add(baseMesh);
+
+      // Viền chân đế thếp vàng
+      const baseTrim = new THREE.Mesh(new THREE.BoxGeometry(0.89, 0.03, 0.75), goldTrimMat);
+      baseTrim.position.y = 0.13;
+      boxGroup.add(baseTrim);
+
+      // 2. Thân hòm sơn son thếp vàng (Main box body)
+      const bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.72, 0.62), lacquerRedMat);
+      bodyMesh.position.y = 0.14 + 0.36;
+      bodyMesh.castShadow = true;
+      bodyMesh.receiveShadow = true;
+      boxGroup.add(bodyMesh);
+
+      // 4 nẹp góc kim loại vàng (Corner gold braces)
+      const cornerOffsets = [
+        [-0.38, -0.31],
+        [0.38, -0.31],
+        [-0.38, 0.31],
+        [0.38, 0.31],
+      ];
+      cornerOffsets.forEach(([cx, cz]) => {
+        const cornerPillar = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.72, 0.04), goldTrimMat);
+        cornerPillar.position.set(cx, 0.50, cz);
+        boxGroup.add(cornerPillar);
+      });
+
+      // 3. Nắp hòm công đức giật cấp (Stepped lid)
+      const lidLower = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.08, 0.68), lacquerRedMat);
+      lidLower.position.y = 0.14 + 0.72 + 0.04;
+      lidLower.castShadow = true;
+      boxGroup.add(lidLower);
+
+      const lidTrim = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.02, 0.70), goldTrimMat);
+      lidTrim.position.y = 0.14 + 0.72 + 0.08;
+      boxGroup.add(lidTrim);
+
+      const lidUpper = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.04, 0.52), lacquerRedMat);
+      lidUpper.position.y = 0.14 + 0.72 + 0.08 + 0.02;
+      boxGroup.add(lidUpper);
+
+      // 4. Khe thả tiền cúng dường mạ vàng (Coin slot)
+      const slotRim = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.015, 0.06), goldTrimMat);
+      slotRim.position.set(0, 0.14 + 0.72 + 0.08 + 0.041, 0);
+      boxGroup.add(slotRim);
+
+      const slotHole = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.02, 0.018), darkSlotMat);
+      slotHole.position.set(0, 0.14 + 0.72 + 0.08 + 0.042, 0);
+      boxGroup.add(slotHole);
+
+      // 5. Khóa đồng và móc bát khóa mặt trước (Padlock & clasp)
+      const latch = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.14, 0.03), goldTrimMat);
+      latch.position.set(0, 0.78, 0.32);
+      boxGroup.add(latch);
+
+      const padlock = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.03), goldTrimMat);
+      padlock.position.set(0, 0.72, 0.33);
+      boxGroup.add(padlock);
+
+      // 6. Bảng hiệu "HÒM CÔNG ĐỨC - CÚNG DƯỜNG TAM BẢO" mặt trước
+      const signMesh = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.28, 0.02), signMat);
+      signMesh.position.set(0, 0.48, 0.32);
+      boxGroup.add(signMesh);
+
+      // Khung viền thếp vàng bảng hiệu
+      const signBorder = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.30, 0.015), goldTrimMat);
+      signBorder.position.set(0, 0.48, 0.315);
+      boxGroup.add(signBorder);
+
+      // 7. Hoa sen vàng phát quang lơ lửng trên nóc hòm công đức
+      const lotusPedestal = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.12, 0.08, 0.04, 16),
+        goldTrimMat
+      );
+      lotusPedestal.position.set(0, 1.03, 0);
+      boxGroup.add(lotusPedestal);
+
+      const lotusFlower = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(0.09),
+        new THREE.MeshStandardMaterial({
+          color: 0xffd700,
+          emissive: 0xffa000,
+          emissiveIntensity: 0.6,
+          roughness: 0.2,
+          metalness: 0.8,
+        })
+      );
+      lotusFlower.position.set(0, 1.12, 0);
+      lotusFlower.scale.set(1.2, 0.7, 1.2);
+      boxGroup.add(lotusFlower);
+
+      // Ánh sáng kim sắc ấm áp tỏa sáng tâm thành
+      const boxLight = new THREE.PointLight(0xffbe40, 0.9, 4.0);
+      boxLight.position.set(0, 1.25, 0.2);
+      boxGroup.add(boxLight);
+
+      // 8. Hitbox tàng hình bao trọn hòm để người chơi dễ dàng chạm vào trên cả Mobile & PC
+      const hitBox = new THREE.Mesh(
+        new THREE.BoxGeometry(1.1, 1.35, 1.1),
+        new THREE.MeshBasicMaterial({ visible: false })
+      );
+      hitBox.position.set(0, 0.65, 0);
+      hitBox.name = `hitbox_${pos.name}`;
+      hitBox.userData = {
+        type: "donation_box",
+        id: pos.name,
+        label: "Hòm Công Đức Cúng Dường Tam Bảo",
+      };
+      boxGroup.add(hitBox);
+
+      // Gắn dữ liệu và thêm vào danh sách tương tác
+      boxGroup.userData = {
+        type: "donation_box",
+        id: pos.name,
+        label: "Hòm Công Đức Cúng Dường Tam Bảo",
+      };
+
+      this.donationBoxMeshes.push(hitBox);
+      this.donationBoxMeshes.push(bodyMesh);
+      this.donationBoxMeshes.push(signMesh);
+      this.donationBoxMeshes.push(lotusFlower);
+
+      parent.add(boxGroup);
+    });
   }
 
   /**

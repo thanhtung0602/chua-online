@@ -91,6 +91,7 @@ export class NetworkService {
   private onRoomFullCb?: (data: { current: number; max?: number; message: string }) => void;
   private onSeatOccupiedCb?: (data: OccupiedSeatEntry) => void;
   private onSeatVacatedCb?: (data: { seatId: string }) => void;
+  private onDonationCompletedCb?: (data: any) => void;
 
   private constructor() {
     this.latestLeaderboard = this.getFallbackLeaderboard();
@@ -265,6 +266,11 @@ export class NetworkService {
       this.socket.on("seat:vacated", (data: { seatId: string }) => {
         this.occupiedSeats.delete(data.seatId);
         if (this.onSeatVacatedCb) this.onSeatVacatedCb(data);
+      });
+
+      // Lắng nghe thông báo hoàn tất cúng dường Tam Bảo
+      this.socket.on("donation:completed", (data: any) => {
+        if (this.onDonationCompletedCb) this.onDonationCompletedCb(data);
       });
     } catch {
       this.isConnected = false;
@@ -485,6 +491,78 @@ export class NetworkService {
     if (this.latestLeaderboard) {
       cb(this.latestLeaderboard);
     }
+  }
+
+  // Quản lý Đơn Cúng Dường Hòm Công Đức (VietQR)
+  public async createDonationOrder(packageId: string, playerName?: string): Promise<any> {
+    const name = playerName || localStorage.getItem("chua_an_lac_player_name") || "Đạo Hữu";
+    if (this.socket && this.isConnected) {
+      return new Promise((resolve) => {
+        this.socket!.emit("donation:create", { playerName: name, packageId }, (res: any) => {
+          if (res) resolve(res);
+          else resolve({ success: false, message: "Không nhận được phản hồi từ máy chủ" });
+        });
+      });
+    }
+
+    try {
+      const res = await fetch("/api/donation/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerName: name, packageId }),
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: "Không thể kết nối đến máy chủ" };
+    }
+  }
+
+  public async checkDonationOrder(orderCode: string): Promise<any> {
+    if (this.socket && this.isConnected) {
+      return new Promise((resolve) => {
+        this.socket!.emit("donation:check", { orderCode }, (res: any) => {
+          if (res) resolve(res);
+          else resolve({ success: false });
+        });
+      });
+    }
+
+    try {
+      const res = await fetch("/api/donation/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderCode }),
+      });
+      return await res.json();
+    } catch {
+      return { success: false };
+    }
+  }
+
+  public async confirmDonationOrder(orderCode: string): Promise<any> {
+    if (this.socket && this.isConnected) {
+      return new Promise((resolve) => {
+        this.socket!.emit("donation:confirm", { orderCode }, (res: any) => {
+          if (res) resolve(res);
+          else resolve({ success: false });
+        });
+      });
+    }
+
+    try {
+      const res = await fetch("/api/donation/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderCode }),
+      });
+      return await res.json();
+    } catch {
+      return { success: false };
+    }
+  }
+
+  public onDonationCompleted(cb: (data: any) => void) {
+    this.onDonationCompletedCb = cb;
   }
 }
 

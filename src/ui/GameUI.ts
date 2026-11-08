@@ -77,6 +77,80 @@ export interface UIEventCallbacks {
   onJoystickMove?: (vector: { x: number; y: number }, distance: number) => void;
 }
 
+export interface DonationPackageClient {
+  id: string;
+  amount: number;
+  meritPoints: number;
+  title: string;
+  badge: string;
+  desc: string;
+  pointsTag: string;
+  highlight?: boolean;
+}
+
+export const DONATION_PACKAGES_CLIENT: DonationPackageClient[] = [
+  {
+    id: "pkg_10k",
+    amount: 10000,
+    meritPoints: 100,
+    title: "Gói Tâm Hương",
+    badge: "🌸 Khởi Tâm Lành",
+    desc: "Thành tâm gieo hạt giống lành nơi Tam Bảo",
+    pointsTag: "+100 Điểm Công Đức",
+    highlight: false,
+  },
+  {
+    id: "pkg_20k",
+    amount: 20000,
+    meritPoints: 250,
+    title: "Gói Thanh Tịnh",
+    badge: "🪷 Hương Sen",
+    desc: "Tâm sen thanh tịnh không vướng trần ai",
+    pointsTag: "+250 Điểm Công Đức",
+    highlight: false,
+  },
+  {
+    id: "pkg_50k",
+    amount: 50000,
+    meritPoints: 700,
+    title: "Gói Bồ Đề",
+    badge: "🌿 Bồ Đề Tâm",
+    desc: "Trí tuệ quang minh, dũng mãnh tinh tấn",
+    pointsTag: "+700 Điểm Công Đức",
+    highlight: true,
+  },
+  {
+    id: "pkg_100k",
+    amount: 100000,
+    meritPoints: 1600,
+    title: "Gói Tịnh Tâm",
+    badge: "🕯️ Đăng Hoa Chiếu",
+    desc: "Ngọn đèn chánh niệm xua tan vô minh",
+    pointsTag: "+1.600 Điểm Công Đức",
+    highlight: false,
+  },
+  {
+    id: "pkg_200k",
+    amount: 200000,
+    meritPoints: 3600,
+    title: "Gói Đại Từ Bi",
+    badge: "✨ Từ Bi Hỷ Xả",
+    desc: "Rộng mở lòng từ bi hỷ xả chở che",
+    pointsTag: "+3.600 Điểm Công Đức",
+    highlight: false,
+  },
+  {
+    id: "pkg_500k",
+    amount: 500000,
+    meritPoints: 10000,
+    title: "Gói Vạn Duyên Tịnh Lạc",
+    badge: "👑 Phúc Báo Vô Biên",
+    desc: "Đại thí chủ hộ trì Tam Bảo thường trụ",
+    pointsTag: "+10.000 Điểm Công Đức",
+    highlight: true,
+  },
+];
+
 export class GameUI {
   private container: HTMLDivElement;
   private callbacks: UIEventCallbacks;
@@ -118,6 +192,11 @@ export class GameUI {
   private isWorkingOnQuest: boolean = false;
   private currentNearQuest: TempleQuest | null = null;
   private questWorkInterval?: number;
+
+  // Trạng thái Hòm Công Đức & Cúng Dường Tam Bảo (VietQR)
+  private selectedDonationPackageId: string = "pkg_10k";
+  private activeDonationOrder: any = null;
+  private donationPollTimer: any = null;
 
   constructor(callbacks: UIEventCallbacks) {
     this.callbacks = callbacks;
@@ -178,6 +257,7 @@ export class GameUI {
                   <button class="nav-btn" data-teleport="bell" title="Đến Lầu Chuông Đại Hồng Chung & Chú Tiểu Trí Tuệ">🔔 Lầu Chuông</button>
                   <button class="nav-btn" id="btn-wardrobe" title="Chọn nhân vật Nam / Nữ và Y phục Phật tử">👤 Nhân Vật</button>
                   <button class="nav-btn highlight-gold" id="btn-leaderboard" title="Bảng Xếp Hạng Công Đức & Vị Trí Trụ Trì">🏆 Bảng Xếp Hạng</button>
+                  <button class="nav-btn highlight-gold" id="btn-menu-donation" title="Cúng Dường Hòm Công Đức Tam Bảo - Mua Điểm Công Đức">🪷 Hòm Công Đức</button>
                   <button class="nav-btn highlight-green" id="btn-open-quests" title="Nhiệm Vụ Chấp Tác Công Quả - Chú Tiểu Tịnh Tâm">🌿 Nhiệm Vụ Công Quả</button>
                 </div>
               </div>
@@ -972,6 +1052,133 @@ export class GameUI {
                 <div class="earn-guide-item">📜 <b>Xin quẻ nguyện ước:</b> +20 Điểm Công Đức/quẻ (tối đa 5 quẻ khác nhau/ngày)</div>
                 <div class="earn-guide-item">👶 <b>Chú Tiểu chúc phúc:</b> +5 Điểm Công Đức (1 lần/ngày)</div>
                 <div class="earn-guide-item">🧘 <b>Thiền định tĩnh tâm:</b> +1 Điểm Công Đức mỗi 30s</div>
+                <div class="earn-guide-item highlight-gold">🪷 <b>Hòm Công Đức Tam Bảo:</b> Cúng dường gieo duyên phước đức vô lượng (10k - 500k)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL: HÒM CÔNG ĐỨC - CÚNG DƯỜNG TAM BẢO (VIETQR) -->
+      <div id="modal-donation" class="modal-backdrop hidden">
+        <div class="modal-box donation-modal-box">
+          <div class="modal-header donation-modal-header">
+            <div class="donation-header-title">
+              <span class="donation-lotus-icon">🪷</span>
+              <div class="donation-headings">
+                <h3>HÒM CÔNG ĐỨC TAM BẢO</h3>
+                <span class="donation-sub">Phát Tâm Cúng Dường • Tích Lũy Phước Đức • Hộ Trì Thiền Môn</span>
+              </div>
+            </div>
+            <button class="modal-close" id="modal-donation-close">✕</button>
+          </div>
+
+          <div class="modal-body donation-modal-body">
+            <!-- VIEW 1: CHỌN GÓI CÔNG ĐỨC -->
+            <div id="donation-view-select" class="donation-view">
+              <div class="donation-banner">
+                <div class="donation-banner-text">
+                  ✨ Quý đạo hữu hoan hỷ phát tâm cúng dường Tam Bảo. Hệ thống tích hợp <b>Mã QR Tự Động</b>: sau khi chuyển khoản, công đức sẽ được <b>tự động cộng ngay lập tức</b> vào tài khoản và cập nhật Bảng Vàng!
+                </div>
+              </div>
+
+              <div class="donation-packages-grid" id="donation-packages-grid">
+                <!-- Danh sách 6 gói nạp từ 10k đến 500k -->
+              </div>
+
+              <div class="donation-bank-summary-card">
+                <div class="dbsc-title">🏦 Tài Khoản Thụ Hưởng Chùa An Lạc:</div>
+                <div class="dbsc-grid">
+                  <div>Ngân hàng: <b>MB Bank (Ngân Hàng TMCP Quân Đội)</b></div>
+                  <div>Số tài khoản: <b>0969856119</b></div>
+                  <div>Chủ tài khoản: <b>LE THANH TUNG</b></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- VIEW 2: QUÉT MÃ VIETQR -->
+            <div id="donation-view-qr" class="donation-view hidden">
+              <div class="donation-qr-container">
+                <div class="donation-qr-left">
+                  <div class="qr-image-wrapper">
+                    <img id="donation-qr-img" src="" alt="Mã VietQR Cúng Dường" class="donation-qr-image" />
+                    <div class="qr-loading-spinner hidden" id="donation-qr-loading">Đang kết nối ngân hàng...</div>
+                  </div>
+                  <div class="qr-scan-hint">📲 Mở App Ngân Hàng hoặc Ví Điện Tử quét mã để hoàn tất chuyển khoản</div>
+                </div>
+
+                <div class="donation-qr-right">
+                  <div class="donation-package-summary" id="donation-selected-summary">
+                    <!-- Tóm tắt gói đang chọn -->
+                  </div>
+
+                  <div class="bank-details-card">
+                    <div class="bd-row">
+                      <span class="bd-label">Ngân hàng:</span>
+                      <span class="bd-val" id="bd-bank-name">MB Bank (Ngân hàng Quân Đội)</span>
+                    </div>
+                    <div class="bd-row">
+                      <span class="bd-label">Số tài khoản:</span>
+                      <div class="bd-val-copy">
+                        <b class="bd-highlight" id="bd-acc-num">0969856119</b>
+                        <button type="button" class="btn-copy-small" id="btn-copy-acc" data-copy="0969856119">📋 Sao chép</button>
+                      </div>
+                    </div>
+                    <div class="bd-row">
+                      <span class="bd-label">Chủ tài khoản:</span>
+                      <b class="bd-val" id="bd-acc-name">LE THANH TUNG</b>
+                    </div>
+                    <div class="bd-row">
+                      <span class="bd-label">Số tiền:</span>
+                      <div class="bd-val-copy">
+                        <b class="bd-highlight-gold" id="bd-amount">10.000 đ</b>
+                        <button type="button" class="btn-copy-small" id="btn-copy-amount">📋 Sao chép</button>
+                      </div>
+                    </div>
+                    <div class="bd-row bd-order-code-row">
+                      <span class="bd-label">Nội dung CK:</span>
+                      <div class="bd-val-copy">
+                        <b class="bd-highlight-code" id="bd-order-code">CD123456</b>
+                        <button type="button" class="btn-copy-small highlight" id="btn-copy-code">📋 Sao chép</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="donation-alert-box">
+                    ⚠️ <b>LƯU Ý QUAN TRỌNG:</b> Quý đạo hữu vui lòng giữ nguyên nội dung chuyển khoản <b><span id="bd-alert-code">CD123456</span></b> để hệ thống tự động cộng công đức ngay lập tức!
+                  </div>
+
+                  <div class="donation-qr-actions">
+                    <button type="button" class="zen-action-btn highlight-gold" id="btn-check-donation">
+                      <span class="btn-pulse-icon">✅</span> Tôi Đã Chuyển Khoản Xong
+                    </button>
+                    <button type="button" class="zen-action-btn" id="btn-back-packages">
+                      ← Chọn Gói Khác
+                    </button>
+                  </div>
+
+                  <div class="donation-polling-status" id="donation-polling-status">
+                    <span class="polling-dot"></span> Đang chờ tín hiệu xác nhận từ ngân hàng...
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- VIEW 3: CÚNG DƯỜNG THÀNH CÔNG -->
+            <div id="donation-view-success" class="donation-view hidden">
+              <div class="donation-success-card">
+                <div class="success-lotus-sparkle">🪷 ✨ 🪷</div>
+                <h3 class="success-title">CÔNG ĐỨC VIÊN MÃN</h3>
+                <div class="success-mantra">NAM MÔ CÔNG ĐỨC LÂM BỒ TÁT MA HA TÁT 🙏</div>
+                <div class="success-details" id="donation-success-details">
+                  <!-- Rendered dynamically -->
+                </div>
+                <div class="success-thanks">
+                  🌸 Nguyện đem công đức thù thắng này, hướng về khắp tất cả chúng sinh, thân tâm an lạc, phúc huệ song tu, vạn sự hanh thông cát tường!
+                </div>
+                <button type="button" class="zen-action-btn highlight-gold btn-close-success" id="btn-donation-done">
+                  🙏 Hoan Hỷ Quay Lại Chùa
+                </button>
               </div>
             </div>
           </div>
@@ -1775,6 +1982,47 @@ export class GameUI {
     });
     document.getElementById("tab-lb-lay")?.addEventListener("click", () => {
       this.switchLeaderboardTab("lay");
+    });
+
+    // 14.05. Hòm Công Đức & Cúng Dường Tam Bảo (VietQR Tự Động)
+    document.getElementById("btn-menu-donation")?.addEventListener("click", () => {
+      this.closeTeleportMenu();
+      this.openDonationModal();
+    });
+    document.getElementById("modal-donation-close")?.addEventListener("click", () => {
+      this.closeDonationModal();
+    });
+    const modalDonation = document.getElementById("modal-donation");
+    modalDonation?.addEventListener("click", (e) => {
+      if (e.target === modalDonation) {
+        this.closeDonationModal();
+      }
+    });
+
+    document.getElementById("btn-back-packages")?.addEventListener("click", () => {
+      this.switchDonationView("select");
+    });
+    document.getElementById("btn-check-donation")?.addEventListener("click", () => {
+      this.handleCheckDonation();
+    });
+    document.getElementById("btn-donation-done")?.addEventListener("click", () => {
+      this.closeDonationModal();
+    });
+
+    document.getElementById("btn-copy-acc")?.addEventListener("click", () => {
+      this.copyToClipboard("0969856119", "Đã sao chép số tài khoản MB Bank: 0969856119");
+    });
+    document.getElementById("btn-copy-amount")?.addEventListener("click", () => {
+      const amtStr = document.getElementById("bd-amount")?.innerText.replace(/\D/g, "") || "";
+      if (amtStr) this.copyToClipboard(amtStr, `Đã sao chép số tiền: ${amtStr} đ`);
+    });
+    document.getElementById("btn-copy-code")?.addEventListener("click", () => {
+      const code = document.getElementById("bd-order-code")?.innerText || "";
+      if (code) this.copyToClipboard(code, `Đã sao chép nội dung chuyển khoản: ${code}`);
+    });
+
+    network.onDonationCompleted((data) => {
+      this.handleDonationCompletedRemote(data);
     });
 
     // 14.1. Badge Số Lượng Người Trong Phòng Chiêm Bái
@@ -4221,5 +4469,293 @@ export class GameUI {
         handlePointerEnd();
       }
     });
+  }
+
+  // ==========================================
+  // HỆ THỐNG HÒM CÔNG ĐỨC & VIETQR TỰ ĐỘNG
+  // ==========================================
+  public copyToClipboard(text: string, successMsg?: string) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        this.appendChatMessage("Hệ Thống", successMsg || `📋 Đã sao chép: ${text}`);
+      }).catch(() => {
+        this.fallbackCopyText(text, successMsg);
+      });
+    } else {
+      this.fallbackCopyText(text, successMsg);
+    }
+  }
+
+  private fallbackCopyText(text: string, successMsg?: string) {
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      this.appendChatMessage("Hệ Thống", successMsg || `📋 Đã sao chép: ${text}`);
+    } catch {
+      this.appendChatMessage("Hệ Thống", `📋 Vui lòng sao chép thủ công: ${text}`);
+    }
+  }
+
+  public openDonationModal() {
+    const modal = document.getElementById("modal-donation");
+    if (!modal) return;
+    this.closeTeleportMenu();
+    modal.classList.remove("hidden");
+    zenAudio.playLotusSound();
+    this.switchDonationView("select");
+    this.renderDonationPackages();
+  }
+
+  public closeDonationModal() {
+    const modal = document.getElementById("modal-donation");
+    if (modal) modal.classList.add("hidden");
+    this.stopDonationPolling();
+  }
+
+  public switchDonationView(view: "select" | "qr" | "success") {
+    const viewSelect = document.getElementById("donation-view-select");
+    const viewQr = document.getElementById("donation-view-qr");
+    const viewSuccess = document.getElementById("donation-view-success");
+    if (!viewSelect || !viewQr || !viewSuccess) return;
+
+    viewSelect.classList.toggle("hidden", view !== "select");
+    viewQr.classList.toggle("hidden", view !== "qr");
+    viewSuccess.classList.toggle("hidden", view !== "success");
+
+    if (view !== "qr") {
+      this.stopDonationPolling();
+    }
+  }
+
+  public renderDonationPackages() {
+    const grid = document.getElementById("donation-packages-grid");
+    if (!grid) return;
+
+    grid.innerHTML = DONATION_PACKAGES_CLIENT.map((pkg) => {
+      const isSelected = pkg.id === this.selectedDonationPackageId;
+      const formattedAmount = pkg.amount.toLocaleString("vi-VN");
+      const highlightClass = pkg.highlight ? "popular-package" : "";
+      return `
+        <div class="donation-pkg-card ${isSelected ? "selected" : ""} ${highlightClass}" data-pkg-id="${pkg.id}">
+          <div class="dpk-top-row">
+            <span class="dpk-badge">${pkg.badge}</span>
+            <span class="dpk-amount">${formattedAmount} <small>VNĐ</small></span>
+          </div>
+          <h4 class="dpk-title">${pkg.title}</h4>
+          <div class="dpk-points-row">
+            <span class="dpk-lotus">🪷</span>
+            <b class="dpk-points-val">${pkg.pointsTag}</b>
+          </div>
+          <p class="dpk-desc">${pkg.desc}</p>
+          <button type="button" class="btn-select-pkg ${isSelected ? "active" : ""}">
+            ${isSelected ? "✓ Đã Chọn" : "Phát Tâm Cúng Dường ➜"}
+          </button>
+        </div>
+      `;
+    }).join("");
+
+    grid.querySelectorAll(".donation-pkg-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        const pkgId = card.getAttribute("data-pkg-id");
+        if (pkgId) {
+          this.selectedDonationPackageId = pkgId;
+          this.startDonationProcess(pkgId);
+        }
+      });
+    });
+  }
+
+  public async startDonationProcess(packageId: string) {
+    this.selectedDonationPackageId = packageId;
+    const pkg = DONATION_PACKAGES_CLIENT.find((p) => p.id === packageId) || DONATION_PACKAGES_CLIENT[0];
+
+    this.switchDonationView("qr");
+
+    const qrImg = document.getElementById("donation-qr-img") as HTMLImageElement;
+    const qrLoading = document.getElementById("donation-qr-loading");
+    const summaryEl = document.getElementById("donation-selected-summary");
+    const bdBankName = document.getElementById("bd-bank-name");
+    const bdAccNum = document.getElementById("bd-acc-num");
+    const bdAccName = document.getElementById("bd-acc-name");
+    const bdAmount = document.getElementById("bd-amount");
+    const bdOrderCode = document.getElementById("bd-order-code");
+    const bdAlertCode = document.getElementById("bd-alert-code");
+
+    if (qrLoading) qrLoading.classList.remove("hidden");
+    if (qrImg) qrImg.style.opacity = "0.3";
+
+    if (summaryEl) {
+      summaryEl.innerHTML = `
+        <div class="dps-badge">${pkg.badge}</div>
+        <div class="dps-title">Gói: <b>${pkg.title}</b></div>
+        <div class="dps-points">Tích lũy: <b class="gold-text">${pkg.pointsTag}</b></div>
+      `;
+    }
+
+    if (bdAmount) bdAmount.innerText = `${pkg.amount.toLocaleString("vi-VN")} đ`;
+
+    // Gọi API/Socket để tạo đơn cúng dường với mã riêng
+    const res = await network.createDonationOrder(packageId, this.playerName);
+    if (res && res.success && res.order) {
+      this.activeDonationOrder = res.order;
+      const order = res.order;
+
+      if (qrImg) {
+        qrImg.src = order.qrUrl;
+        qrImg.onload = () => {
+          if (qrLoading) qrLoading.classList.add("hidden");
+          qrImg.style.opacity = "1";
+        };
+      }
+      if (bdBankName) bdBankName.innerText = "MB Bank (Ngân Hàng Quân Đội)";
+      if (bdAccNum) bdAccNum.innerText = order.accountNumber || "0969856119";
+      if (bdAccName) bdAccName.innerText = order.accountName || "LE THANH TUNG";
+      if (bdAmount) bdAmount.innerText = `${Number(order.amount).toLocaleString("vi-VN")} đ`;
+      if (bdOrderCode) bdOrderCode.innerText = order.orderCode;
+      if (bdAlertCode) bdAlertCode.innerText = order.orderCode;
+
+      // Bắt đầu thăm dò trạng thái đơn mỗi 3 giây
+      this.startDonationPolling(order.orderCode);
+    } else {
+      if (qrLoading) qrLoading.innerText = "Chưa kết nối máy chủ. Quét mã cúng dường:";
+      const fallbackCode = `CD${Math.floor(100000 + Math.random() * 900000)}`;
+      this.activeDonationOrder = {
+        orderCode: fallbackCode,
+        amount: pkg.amount,
+        meritPoints: pkg.meritPoints,
+        packageName: pkg.title,
+      };
+      if (bdOrderCode) bdOrderCode.innerText = fallbackCode;
+      if (bdAlertCode) bdAlertCode.innerText = fallbackCode;
+      if (qrImg) {
+        qrImg.src = `https://img.vietqr.io/image/MB-0969856119-compact2.png?amount=${pkg.amount}&addInfo=${fallbackCode}&accountName=LE%20THANH%20TUNG`;
+        qrImg.onload = () => {
+          if (qrLoading) qrLoading.classList.add("hidden");
+          qrImg.style.opacity = "1";
+        };
+      }
+    }
+  }
+
+  private startDonationPolling(orderCode: string) {
+    this.stopDonationPolling();
+
+    this.donationPollTimer = setInterval(async () => {
+      try {
+        const res = await network.checkDonationOrder(orderCode);
+        if (res && res.success && res.status === "completed") {
+          this.stopDonationPolling();
+          this.showDonationSuccess(res.order || this.activeDonationOrder);
+        }
+      } catch (e) {
+        console.warn("Poll donation error:", e);
+      }
+    }, 3200);
+  }
+
+  private stopDonationPolling() {
+    if (this.donationPollTimer) {
+      clearInterval(this.donationPollTimer);
+      this.donationPollTimer = null;
+    }
+  }
+
+  public async handleCheckDonation() {
+    if (!this.activeDonationOrder) {
+      this.appendChatMessage("Hệ Thống", "Chưa có đơn cúng dường nào đang mở.");
+      return;
+    }
+
+    const checkBtn = document.getElementById("btn-check-donation");
+    if (checkBtn) {
+      checkBtn.innerHTML = "⏳ Đang kiểm tra giao dịch...";
+      (checkBtn as HTMLButtonElement).disabled = true;
+    }
+
+    try {
+      const res = await network.confirmDonationOrder(this.activeDonationOrder.orderCode);
+      if (res && res.success) {
+        this.showDonationSuccess(res.order || this.activeDonationOrder);
+      } else {
+        this.appendChatMessage(
+          "Hệ Thống",
+          res?.message || "Hệ thống chưa nhận được tín hiệu chuyển khoản. Nếu đạo hữu đã chuyển thành công, hoan hỷ chờ 5 - 10 giây để ngân hàng đồng bộ nhé! 🙏"
+        );
+      }
+    } catch {
+      this.appendChatMessage("Hệ Thống", "Không thể kiểm tra giao dịch lúc này. Xin thử lại sau giây lát.");
+    } finally {
+      if (checkBtn) {
+        checkBtn.innerHTML = '<span class="btn-pulse-icon">✅</span> Tôi Đã Chuyển Khoản Xong';
+        (checkBtn as HTMLButtonElement).disabled = false;
+      }
+    }
+  }
+
+  public showDonationSuccess(order: any) {
+    this.stopDonationPolling();
+    this.switchDonationView("success");
+
+    zenAudio.playGrandBell();
+    zenAudio.playLotusSound();
+
+    const detailsEl = document.getElementById("donation-success-details");
+    const amountStr = Number(order.amount || 10000).toLocaleString("vi-VN");
+    const points = Number(order.meritPoints || 100);
+    const pointsStr = points.toLocaleString("vi-VN");
+
+    if (detailsEl) {
+      detailsEl.innerHTML = `
+        <div class="sd-row">
+          <span>Người phát tâm:</span>
+          <b>${this.playerName}</b>
+        </div>
+        <div class="sd-row">
+          <span>Pháp lễ cúng dường:</span>
+          <b class="sd-gold">${order.packageName || "Cúng Dường Tam Bảo"}</b>
+        </div>
+        <div class="sd-row">
+          <span>Tịnh tài cúng dường:</span>
+          <b>${amountStr} VNĐ</b>
+        </div>
+        <div class="sd-row highlight-merit">
+          <span>Tích lũy công đức:</span>
+          <b class="sd-points">+${pointsStr} Điểm Công Đức 🪷</b>
+        </div>
+        <div class="sd-row">
+          <span>Mã công đức:</span>
+          <code>${order.orderCode}</code>
+        </div>
+      `;
+    }
+
+    // Cộng điểm công đức trên client
+    this.incrementCamLo(points, `Cúng Dường ${order.packageName || "Tam Bảo"}`);
+
+    // Gửi yêu cầu cập nhật lại Bảng Xếp Hạng mới nhất từ server
+    network.requestLeaderboard();
+  }
+
+  public handleDonationCompletedRemote(data: any) {
+    if (this.activeDonationOrder && data.orderCode === this.activeDonationOrder.orderCode) {
+      this.showDonationSuccess(data);
+    } else {
+      if (data.playerName === this.playerName) {
+        zenAudio.playGrandBell();
+        zenAudio.playLotusSound();
+        const pts = Number(data.meritPoints) || 0;
+        this.incrementCamLo(pts, `Cúng Dường ${data.packageName || "Tam Bảo"}`);
+        this.appendChatMessage(
+          "Chùa",
+          `🌸 Quý đạo hữu đã cúng dường thành công ${Number(data.amount).toLocaleString("vi-VN")}đ, nhận được +${pts.toLocaleString("vi-VN")} Điểm Công Đức! A Di Đà Phật 🙏`
+        );
+      }
+    }
   }
 }

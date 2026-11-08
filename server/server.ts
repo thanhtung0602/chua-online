@@ -50,6 +50,209 @@ const PlayerProfileSchema = new mongoose.Schema(
 );
 const PlayerProfileModel = mongoose.model("PlayerProfile", PlayerProfileSchema);
 
+// Schema Đơn Cúng Dường Hòm Công Đức (VietQR)
+const DonationOrderSchema = new mongoose.Schema(
+  {
+    orderCode: { type: String, required: true, unique: true, index: true },
+    playerName: { type: String, required: true, index: true },
+    amount: { type: Number, required: true },
+    meritPoints: { type: Number, required: true },
+    packageId: { type: String, required: true },
+    packageName: { type: String, required: true },
+    bankCode: { type: String, default: "MB" },
+    accountNumber: { type: String, default: "0969856119" },
+    accountName: { type: String, default: "LE THANH TUNG" },
+    qrUrl: { type: String, required: true },
+    status: {
+      type: String,
+      enum: ["pending", "completed", "cancelled"],
+      default: "pending",
+      index: true,
+    },
+    paidAt: { type: Date },
+  },
+  { timestamps: true }
+);
+const DonationOrderModel = mongoose.model("DonationOrder", DonationOrderSchema);
+
+// Cấu hình Ngân hàng thụ hưởng & Gói Cúng Dường Tam Bảo
+export const BANK_CONFIG = {
+  bankCode: "MB",
+  bankName: "Ngân Hàng TMCP Quân Đội (MB Bank)",
+  accountNumber: "0969856119",
+  accountName: "LE THANH TUNG",
+};
+
+export interface DonationPackage {
+  id: string;
+  amount: number;
+  meritPoints: number;
+  title: string;
+  badge: string;
+  desc: string;
+}
+
+export const DONATION_PACKAGES: DonationPackage[] = [
+  {
+    id: "pkg_10k",
+    amount: 10000,
+    meritPoints: 100,
+    title: "Gói Tâm Hương",
+    badge: "🌸 Khởi Tâm Lành",
+    desc: "Thành tâm gieo hạt giống lành nơi Tam Bảo (+100 Điểm Công Đức)",
+  },
+  {
+    id: "pkg_20k",
+    amount: 20000,
+    meritPoints: 250,
+    title: "Gói Thanh Tịnh",
+    badge: "🪷 Hương Sen",
+    desc: "Tâm sen thanh tịnh không vướng trần ai (+250 Điểm Công Đức)",
+  },
+  {
+    id: "pkg_50k",
+    amount: 50000,
+    meritPoints: 700,
+    title: "Gói Bồ Đề",
+    badge: "🌿 Bồ Đề Tâm",
+    desc: "Trí tuệ quang minh, dũng mãnh tinh tấn (+700 Điểm Công Đức)",
+  },
+  {
+    id: "pkg_100k",
+    amount: 100000,
+    meritPoints: 1600,
+    title: "Gói Tịnh Tâm",
+    badge: "🕯️ Đăng Hoa Chiếu",
+    desc: "Ngọn đèn chánh niệm xua tan vô minh (+1.600 Điểm Công Đức)",
+  },
+  {
+    id: "pkg_200k",
+    amount: 200000,
+    meritPoints: 3600,
+    title: "Gói Đại Từ Bi",
+    badge: "✨ Từ Bi Hỷ Xả",
+    desc: "Rộng mở lòng từ bi hỷ xả chở che (+3.600 Điểm Công Đức)",
+  },
+  {
+    id: "pkg_500k",
+    amount: 500000,
+    meritPoints: 10000,
+    title: "Gói Vạn Duyên Tịnh Lạc",
+    badge: "👑 Phúc Báo Vô Biên",
+    desc: "Đại thí chủ hộ trì Tam Bảo thường trụ (+10.000 Điểm Công Đức)",
+  },
+];
+
+const donationOrders: Map<string, any> = new Map();
+
+function generateOrderCode(): string {
+  const digits = Math.floor(100000 + Math.random() * 900000);
+  return `CD${digits}`;
+}
+
+function buildVietQrUrl(amount: number, orderCode: string): string {
+  const encAccountName = encodeURIComponent(BANK_CONFIG.accountName);
+  const encAddInfo = encodeURIComponent(orderCode);
+  return `https://img.vietqr.io/image/${BANK_CONFIG.bankCode}-${BANK_CONFIG.accountNumber}-compact2.png?amount=${amount}&addInfo=${encAddInfo}&accountName=${encAccountName}`;
+}
+
+async function completeDonationOrder(orderCode: string, source: string = "manual"): Promise<{ success: boolean; message: string; order?: any }> {
+  let order = donationOrders.get(orderCode);
+  if (!order && isMongoConnected) {
+    try {
+      order = await DonationOrderModel.findOne({ orderCode }).lean();
+    } catch (e) {
+      console.warn("Lỗi tìm đơn cúng dường:", e);
+    }
+  }
+
+  if (!order) {
+    return { success: false, message: `Không tìm thấy đơn cúng dường với mã ${orderCode}.` };
+  }
+
+  if (order.status === "completed") {
+    return { success: true, message: "Đơn cúng dường này đã được cộng công đức trước đó.", order };
+  }
+
+  order.status = "completed";
+  order.paidAt = new Date();
+  donationOrders.set(orderCode, order);
+
+  if (isMongoConnected) {
+    try {
+      await DonationOrderModel.updateOne(
+        { orderCode },
+        { $set: { status: "completed", paidAt: order.paidAt } }
+      );
+    } catch (e) {
+      console.warn("Lỗi cập nhật MongoDB đơn cúng dường:", e);
+    }
+  }
+
+  const playerName = order.playerName;
+  const points = Number(order.meritPoints) || 100;
+  const todayStr = getVietnamDateString();
+
+  // 1. Cập nhật hồ sơ trên MongoDB Atlas
+  if (isMongoConnected) {
+    try {
+      await PlayerProfileModel.findOneAndUpdate(
+        { name: playerName },
+        {
+          $inc: { camLoToday: points, totalCamLo: points },
+          $set: { lastDate: todayStr },
+        },
+        { upsert: true, new: true }
+      );
+    } catch (e) {
+      console.warn("Lỗi lưu điểm công đức vào MongoDB PlayerProfile:", e);
+    }
+  }
+
+  // 2. Cập nhật Bảng Xếp Hạng realtime
+  if (!leaderboardState.entries[playerName]) {
+    leaderboardState.entries[playerName] = {
+      name: playerName,
+      avatar: "female",
+      camLoToday: points,
+      totalCamLo: points,
+      lastUpdated: Date.now(),
+      isMonk: playerName.startsWith("Thích "),
+    };
+  } else {
+    leaderboardState.entries[playerName].camLoToday = (leaderboardState.entries[playerName].camLoToday || 0) + points;
+    leaderboardState.entries[playerName].totalCamLo = (leaderboardState.entries[playerName].totalCamLo || 0) + points;
+    leaderboardState.entries[playerName].lastUpdated = Date.now();
+  }
+
+  saveLeaderboardData();
+  broadcastLeaderboard();
+
+  // 3. Gửi thông báo hoàn tất giao dịch cho client
+  const updatedPoints = leaderboardState.entries[playerName].camLoToday;
+  io.emit("donation:completed", {
+    orderCode,
+    playerName,
+    amount: order.amount,
+    meritPoints: points,
+    packageName: order.packageName,
+    totalCamLo: updatedPoints,
+  });
+
+  // 4. Phát loa chúc phúc toàn thể đạo hữu trong chùa
+  const amountFormatted = Number(order.amount).toLocaleString("vi-VN");
+  const pointsFormatted = points.toLocaleString("vi-VN");
+  const blessMsg = `🌸 [CÚNG DƯỜNG TAM BẢO] Đạo hữu [${playerName}] vừa phát tâm cúng dường ${amountFormatted}đ (${order.packageName}), tích lũy +${pointsFormatted} Điểm Công Đức! Công đức vô lượng, thân tâm an lạc! A Di Đà Phật 🙏✨`;
+
+  io.emit("chat:bubble", {
+    id: "system",
+    text: blessMsg,
+  });
+
+  console.log(`🎉 [Cúng Dường Thành Công - ${source}] Đạo hữu ${playerName} cúng dường ${amountFormatted}đ -> +${points} công đức!`);
+  return { success: true, message: "Công đức đã được ghi nhận thành công!", order };
+}
+
 let isMongoConnected = false;
 
 const app = express();
@@ -589,6 +792,130 @@ app.get("/api/version", (_req, res) => {
   });
 });
 
+// ==========================================
+// REST API CHO HÒM CÔNG ĐỨC & VIETQR
+// ==========================================
+app.get("/api/donation/packages", (_req, res) => {
+  res.json({
+    success: true,
+    packages: DONATION_PACKAGES,
+    bankConfig: BANK_CONFIG,
+  });
+});
+
+app.post("/api/donation/create", async (req, res) => {
+  try {
+    const { playerName, packageId } = req.body || {};
+    const pkg = DONATION_PACKAGES.find((p) => p.id === packageId) || DONATION_PACKAGES[0];
+    const name = (playerName || "Đạo Hữu Vô Danh").trim().slice(0, 30);
+    const orderCode = generateOrderCode();
+    const qrUrl = buildVietQrUrl(pkg.amount, orderCode);
+
+    const orderData = {
+      orderCode,
+      playerName: name,
+      amount: pkg.amount,
+      meritPoints: pkg.meritPoints,
+      packageId: pkg.id,
+      packageName: pkg.title,
+      bankCode: BANK_CONFIG.bankCode,
+      accountNumber: BANK_CONFIG.accountNumber,
+      accountName: BANK_CONFIG.accountName,
+      qrUrl,
+      status: "pending",
+      createdAt: new Date(),
+    };
+
+    donationOrders.set(orderCode, orderData);
+
+    if (isMongoConnected) {
+      try {
+        await DonationOrderModel.create(orderData);
+      } catch (err) {
+        console.warn("MongoDB create donation order error:", err);
+      }
+    }
+
+    res.json({
+      success: true,
+      order: orderData,
+      bankConfig: BANK_CONFIG,
+    });
+  } catch (error) {
+    console.error("Lỗi tạo đơn cúng dường:", error);
+    res.status(500).json({ success: false, message: "Không thể tạo đơn cúng dường" });
+  }
+});
+
+app.post("/api/donation/check", async (req, res) => {
+  try {
+    const { orderCode } = req.body || {};
+    if (!orderCode) {
+      return res.status(400).json({ success: false, message: "Thiếu mã đơn cúng dường" });
+    }
+
+    let order = donationOrders.get(orderCode);
+    if (!order && isMongoConnected) {
+      order = await DonationOrderModel.findOne({ orderCode }).lean();
+    }
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: "Không tìm thấy đơn cúng dường" });
+    }
+
+    res.json({
+      success: true,
+      status: order.status,
+      order,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Lỗi kiểm tra đơn cúng dường" });
+  }
+});
+
+app.post("/api/donation/confirm", async (req, res) => {
+  try {
+    const { orderCode } = req.body || {};
+    if (!orderCode) {
+      return res.status(400).json({ success: false, message: "Thiếu mã đơn cúng dường" });
+    }
+
+    const result = await completeDonationOrder(orderCode, "api_confirm");
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Lỗi xác nhận cúng dường" });
+  }
+});
+
+// Webhook tự động nhận thông báo từ ngân hàng (SePAY, Casso, MB Bank webhook, v.v.)
+app.post("/api/donation/webhook", async (req, res) => {
+  try {
+    console.log("📥 [Donation Webhook Nhận Được]:", JSON.stringify(req.body));
+    const body = req.body || {};
+    const content = String(
+      body.content ||
+      body.description ||
+      body.memo ||
+      body.transferContent ||
+      body.message ||
+      ""
+    );
+
+    const match = content.match(/CD\d{6}/i);
+    if (match) {
+      const orderCode = match[0].toUpperCase();
+      console.log(`🔍 Webhook tìm thấy mã đơn cúng dường: ${orderCode}`);
+      const result = await completeDonationOrder(orderCode, "bank_webhook");
+      return res.json({ success: true, processed: true, result });
+    }
+
+    res.json({ success: true, processed: false, message: "Không tìm thấy mã đơn cúng dường hợp lệ" });
+  } catch (error) {
+    console.error("Lỗi xử lý webhook cúng dường:", error);
+    res.status(500).json({ success: false, message: "Lỗi xử lý webhook" });
+  }
+});
+
 // SPA Fallback cho các route khác (đảm bảo reload trang không bị 404, tương thích Express 5)
 app.use((req, res, next) => {
   if (req.method !== "GET" || req.path.startsWith("/api") || req.path.startsWith("/socket.io")) {
@@ -1111,6 +1438,99 @@ io.on("connection", (socket: Socket) => {
       });
     }
   });
+
+  // 6.5. Hòm Công Đức & VietQR Cúng Dường Tam Bảo
+  socket.on(
+    "donation:create",
+    async (
+      data: { playerName?: string; packageId: string },
+      callback?: (res: any) => void
+    ) => {
+      try {
+        const player = players.get(socket.id);
+        const name = (data.playerName || player?.name || "Đạo Hữu Vô Danh").trim().slice(0, 30);
+        const pkg = DONATION_PACKAGES.find((p) => p.id === data.packageId) || DONATION_PACKAGES[0];
+        const orderCode = generateOrderCode();
+        const qrUrl = buildVietQrUrl(pkg.amount, orderCode);
+
+        const orderData = {
+          orderCode,
+          playerName: name,
+          amount: pkg.amount,
+          meritPoints: pkg.meritPoints,
+          packageId: pkg.id,
+          packageName: pkg.title,
+          bankCode: BANK_CONFIG.bankCode,
+          accountNumber: BANK_CONFIG.accountNumber,
+          accountName: BANK_CONFIG.accountName,
+          qrUrl,
+          status: "pending",
+          createdAt: new Date(),
+        };
+
+        donationOrders.set(orderCode, orderData);
+
+        if (isMongoConnected) {
+          try {
+            await DonationOrderModel.create(orderData);
+          } catch (err) {
+            console.warn("MongoDB create donation order error:", err);
+          }
+        }
+
+        const response = {
+          success: true,
+          order: orderData,
+          bankConfig: BANK_CONFIG,
+        };
+
+        if (typeof callback === "function") {
+          callback(response);
+        } else {
+          socket.emit("donation:created", response);
+        }
+      } catch (err) {
+        console.error("Socket donation:create error:", err);
+        if (typeof callback === "function") {
+          callback({ success: false, message: "Lỗi tạo đơn cúng dường" });
+        }
+      }
+    }
+  );
+
+  socket.on(
+    "donation:check",
+    async (
+      data: { orderCode: string },
+      callback?: (res: any) => void
+    ) => {
+      const orderCode = (data.orderCode || "").trim().toUpperCase();
+      let order = donationOrders.get(orderCode);
+      if (!order && isMongoConnected) {
+        order = await DonationOrderModel.findOne({ orderCode }).lean();
+      }
+
+      const res = order
+        ? { success: true, status: order.status, order }
+        : { success: false, message: "Không tìm thấy đơn cúng dường" };
+
+      if (typeof callback === "function") callback(res);
+      else socket.emit("donation:status", res);
+    }
+  );
+
+  socket.on(
+    "donation:confirm",
+    async (
+      data: { orderCode: string },
+      callback?: (res: any) => void
+    ) => {
+      const orderCode = (data.orderCode || "").trim().toUpperCase();
+      const res = await completeDonationOrder(orderCode, "player_socket_confirm");
+      if (typeof callback === "function") callback(res);
+      else socket.emit("donation:confirmed", res);
+    }
+  );
 
   // 7. Rời mạng
   socket.on("disconnect", () => {

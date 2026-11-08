@@ -421,6 +421,15 @@ class ChuaAnLacGame {
       }
     }
 
+    // 2.5. Kiểm tra click vào Hòm Công Đức (Cúng Dường Tam Bảo)
+    if (this.world.donationBoxMeshes && this.world.donationBoxMeshes.length > 0) {
+      const boxHits = this.raycaster.intersectObjects(this.world.donationBoxMeshes, true);
+      if (boxHits.length > 0) {
+        this.gameUI.openDonationModal();
+        return;
+      }
+    }
+
     // 3. Kiểm tra click vào Bồ Đoàn / Pháp Tòa trong Chính Điện
     if (this.player.action === "meditate" || this.gameUI.getIsMeditating()) {
       // Đang ngồi thiền mà click chạm màn hình -> Xả thiền, đứng dậy thoát khỏi chỗ ngồi
