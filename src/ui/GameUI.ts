@@ -3352,27 +3352,29 @@ export class GameUI {
   }
 
   public setPlayerInfo(name: string, gender: "male" | "female") {
-    this.playerName = name;
+    const cleanName = (name || "").replace(/\s*#\d+$/, "").trim();
+    this.playerName = cleanName;
     this.playerGender = gender;
     const myNameEl = document.getElementById("my-standing-name");
-    if (myNameEl) myNameEl.innerText = name;
+    if (myNameEl) myNameEl.innerText = cleanName;
     const nameInput = document.getElementById("input-character-name") as HTMLInputElement | null;
-    if (nameInput) nameInput.value = name;
+    if (nameInput) nameInput.value = cleanName;
 
-    const saved = getSavedMeritPoints(name);
+    const saved = getSavedMeritPoints(cleanName);
     if (saved > 0 || this.getMeritPoints() === 0) {
       this.setMeritPoints(saved);
     }
   }
 
   public setPlayerName(name: string) {
-    this.playerName = name;
+    const cleanName = (name || "").replace(/\s*#\d+$/, "").trim();
+    this.playerName = cleanName;
     const myNameEl = document.getElementById("my-standing-name");
-    if (myNameEl) myNameEl.innerText = name;
+    if (myNameEl) myNameEl.innerText = cleanName;
     const nameInput = document.getElementById("input-character-name") as HTMLInputElement | null;
-    if (nameInput) nameInput.value = name;
+    if (nameInput) nameInput.value = cleanName;
 
-    const saved = getSavedMeritPoints(name);
+    const saved = getSavedMeritPoints(cleanName);
     if (saved > 0 || this.getMeritPoints() === 0) {
       this.setMeritPoints(saved);
     }
@@ -3529,7 +3531,8 @@ export class GameUI {
         let monkHtml = "";
         monasticList.forEach((entry, idx) => {
           const rank = idx + 1;
-          const isSelf = entry.name === this.playerName;
+          const displayName = (entry.name || "").replace(/\s*#\d+$/, "").trim();
+          const isSelf = displayName === this.playerName || entry.name === this.playerName;
           const isSeniorMonk = rank >= 2 && rank <= 13;
           const rowClass = `leaderboard-row rank-${rank === 1 ? "1" : isSeniorMonk ? "senior" : "other"} ${isSelf ? "is-self" : ""}`;
 
@@ -3562,7 +3565,7 @@ export class GameUI {
                 ${rankBadge}
                 <span class="lb-avatar">${avatarIcon}</span>
                 <div class="lb-name-group">
-                  <span class="lb-player-name">${entry.name} ${selfTag}</span>
+                  <span class="lb-player-name">${displayName} ${selfTag}</span>
                   ${crownTag}
                 </div>
               </div>
@@ -3590,7 +3593,8 @@ export class GameUI {
         let layHtml = "";
         layList.forEach((entry, idx) => {
           const rank = idx + 1;
-          const isSelf = entry.name === this.playerName;
+          const displayName = (entry.name || "").replace(/\s*#\d+$/, "").trim();
+          const isSelf = displayName === this.playerName || entry.name === this.playerName;
           const rowClass = `leaderboard-row rank-${rank === 1 ? "1" : rank <= 3 ? "2" : "other"} ${isSelf ? "is-self" : ""}`;
 
           let rankBadge = `<span class="rank-num">#${rank}</span>`;
@@ -3622,7 +3626,7 @@ export class GameUI {
                 ${rankBadge}
                 <span class="lb-avatar">${avatarIcon}</span>
                 <div class="lb-name-group">
-                  <span class="lb-player-name">${entry.name} ${selfTag}</span>
+                  <span class="lb-player-name">${displayName} ${selfTag}</span>
                   ${titleTag}
                 </div>
               </div>
@@ -3670,7 +3674,8 @@ export class GameUI {
         let donorHtml = "";
         donorList.forEach((entry, idx) => {
           const rank = idx + 1;
-          const isSelf = entry.name === this.playerName;
+          const displayName = (entry.name || "").replace(/\s*#\d+$/, "").trim();
+          const isSelf = displayName === this.playerName || entry.name === this.playerName;
           const rowClass = `leaderboard-row rank-${rank === 1 ? "1" : rank <= 3 ? "senior" : "other"} ${isSelf ? "is-self" : ""}`;
 
           let rankBadge = `<span class="rank-num">#${rank}</span>`;
@@ -3703,7 +3708,7 @@ export class GameUI {
                 ${rankBadge}
                 <span class="lb-avatar">${avatarIcon}</span>
                 <div class="lb-name-group">
-                  <span class="lb-player-name">${entry.name} ${selfTag}</span>
+                  <span class="lb-player-name">${displayName} ${selfTag}</span>
                   ${titleTag}
                 </div>
               </div>

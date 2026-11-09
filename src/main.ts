@@ -1266,9 +1266,11 @@ class ChuaAnLacGame {
     network.requestLeaderboard();
 
     // Hook thông báo cập nhật phiên bản máy chủ mới (Zero-downtime client notification)
-    const CLIENT_VERSION = "1.0.0";
+    const CLIENT_VERSION = "1.1.0";
     network.setOnUpdateAvailable((data) => {
-      this.gameUI.showUpdateBanner(data.version, data.message);
+      if (data && data.version && data.version !== CLIENT_VERSION) {
+        this.gameUI.showUpdateBanner(data.version, data.message);
+      }
     });
 
     const checkServerVersion = async () => {
@@ -1536,9 +1538,10 @@ class ChuaAnLacGame {
       );
     }
 
-    // 10.9. Cập nhật Prompt Tòa Tàng Kinh Các khi đứng gần (bên phải Chính Điện)
-    const distToTKC = Math.hypot(this.player.worldX - 10.5, this.player.worldZ - (-10.0));
-    this.gameUI.updateTangKinhCacPrompt(distToTKC < 4.2);
+    // 10.9. Cập nhật Prompt Tòa Tàng Kinh Các khi đứng gần (cả Tòa Tháp ngoài sân và Gian Tàng Kinh trong Chính Điện)
+    const distOutdoor = Math.hypot(this.player.worldX - 10.5, this.player.worldZ - (-10.0));
+    const distIndoor = Math.hypot(this.player.worldX - 16.5, this.player.worldZ - (-31.0));
+    this.gameUI.updateTangKinhCacPrompt(distOutdoor < 4.2 || distIndoor < 4.2);
 
     // 11. Cập nhật bong bóng thoại
     this.speechBubbles.update();

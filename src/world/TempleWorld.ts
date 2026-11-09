@@ -60,6 +60,7 @@ export class TempleWorld {
     this.createImperialGate();
     this.createBellTower();
     this.createScripturePavilion();
+    this.createMainHallScriptureAlcove();
     this.createAncientBodhiTrees();
     this.createHexagonalStoneLanterns();
     this.createBambooGroves();
@@ -5924,6 +5925,288 @@ export class TempleWorld {
     // 4. Bàn đọc kinh ở giữa (ngăn người chơi đi xuyên qua bàn thư phòng)
     this.colliders.push(
       new THREE.Box3(new THREE.Vector3(9.6, 0, -11.1), new THREE.Vector3(11.4, 1.5, -9.8))
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // GIAN TÀNG KINH CÁC NỘI ĐIỆN (INDOOR SCRIPTURE ALCOVE)
+  // Tọa lạc tại Cánh Phải Bên Trong Đại Hùng Bảo Điện (x = 17.2, z = -31.0, y = 0.65)
+  // Ngay bên cạnh Pháp Tòa Trụ Trì nhìn sang tay phải để quý đạo hữu đọc & chiêm bái kinh điển!
+  // ─────────────────────────────────────────────
+  private createMainHallScriptureAlcove() {
+    const group = new THREE.Group();
+    group.position.set(17.2, 0.65, -31.0);
+
+    const darkWoodMat = new THREE.MeshStandardMaterial({ color: 0x2a1007, roughness: 0.65 });
+    const mahoganyMat = new THREE.MeshStandardMaterial({ color: 0x351208, roughness: 0.48 });
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.28, metalness: 0.85 });
+    const redSilkMat = new THREE.MeshStandardMaterial({ color: 0xb01b1b, roughness: 0.4 });
+    const cushionSilkMat = new THREE.MeshStandardMaterial({ color: 0xf39c12, roughness: 0.5, emissive: 0x935116, emissiveIntensity: 0.15 });
+
+    const scrollGoldMat = new THREE.MeshStandardMaterial({ color: 0xf4d03f, roughness: 0.4, metalness: 0.3 });
+    const scrollRedMat = new THREE.MeshStandardMaterial({ color: 0x922b21, roughness: 0.45 });
+    const scrollJadeMat = new THREE.MeshStandardMaterial({ color: 0x196f3d, roughness: 0.45 });
+    const scrollBlueMat = new THREE.MeshStandardMaterial({ color: 0x2471a3, roughness: 0.45 });
+    const scrollMaterials = [scrollGoldMat, scrollRedMat, scrollJadeMat, scrollBlueMat];
+
+    // ==========================================
+    // 1. CỔNG VÒM HOA VĂN & HOÀNH PHI "TÀNG KINH CÁC"
+    // ==========================================
+    const archGroup = new THREE.Group();
+    archGroup.position.set(-1.0, 0, 0);
+    group.add(archGroup);
+
+    // 2 Trụ cột lối vào gian tàng kinh
+    [-2.6, 2.6].forEach((az) => {
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 5.0, 12), darkWoodMat);
+      col.position.set(0, 2.5, az);
+      col.castShadow = true;
+      archGroup.add(col);
+
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.22, 0.46), goldMat);
+      cap.position.set(0, 5.0, az);
+      archGroup.add(cap);
+    });
+
+    // Xà ngang cửa võng trên cao (y = 5.0m)
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.35, 5.5), darkWoodMat);
+    lintel.position.set(0, 5.0, 0);
+    archGroup.add(lintel);
+
+    // Bảng Hoành Phi chữ vàng "✦ TÀNG KINH CÁC ✦"
+    const plaqueCanvas = document.createElement("canvas");
+    plaqueCanvas.width = 512;
+    plaqueCanvas.height = 140;
+    const pCtx = plaqueCanvas.getContext("2d")!;
+    pCtx.fillStyle = "#380d05";
+    pCtx.fillRect(0, 0, 512, 140);
+    pCtx.strokeStyle = "#ffd700";
+    pCtx.lineWidth = 5;
+    pCtx.strokeRect(6, 6, 500, 128);
+    pCtx.strokeStyle = "rgba(255, 215, 0, 0.4)";
+    pCtx.lineWidth = 2;
+    pCtx.strokeRect(12, 12, 488, 116);
+
+    pCtx.fillStyle = "#ffd700";
+    pCtx.font = "bold 44px 'Be Vietnam Pro', serif";
+    pCtx.textAlign = "center";
+    pCtx.textBaseline = "middle";
+    pCtx.fillText("✦ TÀNG KINH CÁC ✦", 256, 52);
+
+    pCtx.fillStyle = "#f9e79f";
+    pCtx.font = "bold 20px 'Be Vietnam Pro', sans-serif";
+    pCtx.fillText("藏 經 閣 · KHO TÀNG PHÁP BẢO PHẬT GIÁO", 256, 102);
+
+    const plaqueTex = new THREE.CanvasTexture(plaqueCanvas);
+    const plaqueMat = new THREE.MeshBasicMaterial({ map: plaqueTex });
+    const plaqueMesh = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.65), plaqueMat);
+    plaqueMesh.position.set(-0.18, 4.85, 0);
+    plaqueMesh.rotation.y = -Math.PI / 2; // Hướng ra lòng Chính Điện
+    archGroup.add(plaqueMesh);
+
+    plaqueMesh.name = "indoor_tang_kinh_cac_plaque";
+    this.tangKinhCacMeshes.push(plaqueMesh);
+
+    // ==========================================
+    // 2. ĐẠI TỦ KINH SƠN SON THẾP VÀNG SÁT VÁCH PHẢI
+    // ==========================================
+    const bcGroup = new THREE.Group();
+    bcGroup.position.set(0.9, 0, 0);
+    group.add(bcGroup);
+
+    const bcWidth = 0.55;
+    const bcHeight = 4.2;
+    const bcLength = 5.4;
+    const bcFrame = new THREE.Mesh(new THREE.BoxGeometry(bcWidth, bcHeight, bcLength), mahoganyMat);
+    bcFrame.position.y = bcHeight / 2;
+    bcFrame.castShadow = true;
+    bcGroup.add(bcFrame);
+
+    // Viền dát vàng nóc tủ & chân tủ
+    const goldTop = new THREE.Mesh(new THREE.BoxGeometry(bcWidth + 0.12, 0.14, bcLength + 0.16), goldMat);
+    goldTop.position.y = bcHeight;
+    bcGroup.add(goldTop);
+
+    const goldBase = new THREE.Mesh(new THREE.BoxGeometry(bcWidth + 0.12, 0.14, bcLength + 0.16), goldMat);
+    goldBase.position.y = 0.07;
+    bcGroup.add(goldBase);
+
+    // 5 Tầng kệ chứa đầy kinh thư
+    const shelfLevels = [0.8, 1.5, 2.2, 2.9, 3.6];
+    shelfLevels.forEach((sy, sIdx) => {
+      const plank = new THREE.Mesh(new THREE.BoxGeometry(bcWidth + 0.04, 0.06, bcLength - 0.2), darkWoodMat);
+      plank.position.y = sy;
+      bcGroup.add(plank);
+
+      // Đặt các cuộn kinh thư lụa & sách kinh
+      for (let k = -4; k <= 4; k++) {
+        const itemZ = k * 0.56;
+        const mat = scrollMaterials[(sIdx + k + 10) % scrollMaterials.length];
+
+        if ((sIdx + k) % 2 === 0) {
+          const scroll = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.48, 12), mat);
+          scroll.position.set(-0.06, sy + 0.10, itemZ);
+          scroll.castShadow = true;
+          bcGroup.add(scroll);
+
+          const clasp = new THREE.Mesh(new THREE.CylinderGeometry(0.086, 0.086, 0.06, 12), goldMat);
+          clasp.position.set(-0.06, sy + 0.10, itemZ);
+          bcGroup.add(clasp);
+        } else {
+          const book = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.44, 0.12), mat);
+          book.position.set(-0.06, sy + 0.23, itemZ);
+          book.castShadow = true;
+          bcGroup.add(book);
+
+          const spine = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.44, 0.02), goldMat);
+          spine.position.set(-0.06, sy + 0.23, itemZ - 0.05);
+          bcGroup.add(spine);
+        }
+      }
+    });
+
+    bcGroup.name = "indoor_tang_kinh_cac_bookcase";
+    this.tangKinhCacMeshes.push(bcGroup);
+
+    // ==========================================
+    // 3. BÀN THƯ PHÒNG ĐỌC KINH & KINH THƯ TỎA HÀO QUANG
+    // ==========================================
+    const deskGroup = new THREE.Group();
+    deskGroup.position.set(-0.9, 0, 0);
+    group.add(deskGroup);
+
+    // Mặt bàn gỗ lim
+    const deskTop = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.09, 2.2), mahoganyMat);
+    deskTop.position.y = 0.74;
+    deskTop.castShadow = true;
+    deskTop.receiveShadow = true;
+    deskGroup.add(deskTop);
+
+    const deskRim = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.03, 2.26), goldMat);
+    deskRim.position.y = 0.78;
+    deskGroup.add(deskRim);
+
+    // 4 Chân bàn chạm trổ
+    [
+      [-0.42, -0.95],
+      [0.42, -0.95],
+      [-0.42, 0.95],
+      [0.42, 0.95],
+    ].forEach(([dx, dz]) => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.72, 8), darkWoodMat);
+      leg.position.set(dx, 0.36, dz);
+      leg.castShadow = true;
+      deskGroup.add(leg);
+    });
+
+    // ----------------------------------------------------
+    // GIÁ ĐỠ KINH & QUYỂN KINH BÁT NHÃ MỞ SẴN TỎA HÀO QUANG VÀNG KIM
+    // ----------------------------------------------------
+    const scrollStand = new THREE.Group();
+    scrollStand.position.set(0.05, 0.78, 0);
+    deskGroup.add(scrollStand);
+
+    const bookRest = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.04, 0.95), darkWoodMat);
+    bookRest.position.y = 0.08;
+    bookRest.rotation.z = -0.35;
+    scrollStand.add(bookRest);
+
+    // Canvas bản dịch Bát Nhã Ba La Mật Đa Tâm Kinh
+    const sutraCanvas = document.createElement("canvas");
+    sutraCanvas.width = 512;
+    sutraCanvas.height = 340;
+    const sCtx = sutraCanvas.getContext("2d")!;
+    sCtx.fillStyle = "#fdf5e6";
+    sCtx.fillRect(0, 0, 512, 340);
+    sCtx.strokeStyle = "#922b21";
+    sCtx.lineWidth = 6;
+    sCtx.strokeRect(8, 8, 496, 324);
+    sCtx.lineWidth = 2;
+    sCtx.strokeRect(16, 16, 480, 308);
+
+    sCtx.fillStyle = "#922b21";
+    sCtx.font = "bold 26px 'Be Vietnam Pro', serif";
+    sCtx.textAlign = "center";
+    sCtx.fillText("BÁT NHÃ BA LA MẬT ĐA TÂM KINH", 256, 46);
+
+    sCtx.fillStyle = "#2c1505";
+    sCtx.font = "16px 'Be Vietnam Pro', serif";
+    sCtx.textAlign = "left";
+    sCtx.fillText("Quán Tự Tại Bồ Tát hành thâm Bát Nhã Ba La Mật Đa", 35, 95);
+    sCtx.fillText("thời chiếu kiến ngũ uẩn giai không độ nhất thiết khổ ách.", 35, 130);
+    sCtx.fillText("Xá Lợi Tử, sắc bất dị không, không bất dị sắc,", 35, 165);
+    sCtx.fillText("sắc tức thị không, không tức thị sắc...", 35, 200);
+    sCtx.fillText("Yết đế, yết đế, ba la yết đế, ba la tăng yết đế...", 35, 245);
+
+    sCtx.fillStyle = "#922b21";
+    sCtx.font = "bold 18px 'Be Vietnam Pro', serif";
+    sCtx.textAlign = "center";
+    sCtx.fillText("❖ BỒ ĐỀ TÁT BÀ HA ❖", 256, 295);
+
+    const sutraTex = new THREE.CanvasTexture(sutraCanvas);
+    const openSutraMat = new THREE.MeshStandardMaterial({
+      map: sutraTex,
+      roughness: 0.65,
+      emissive: 0xffd700,
+      emissiveIntensity: 0.35,
+    });
+
+    const openSutra = new THREE.Mesh(new THREE.PlaneGeometry(0.88, 0.52), openSutraMat);
+    openSutra.position.set(0, 0.11, 0);
+    openSutra.rotation.set(-Math.PI / 2, 0, -Math.PI / 2);
+    openSutra.rotation.y = 0.35;
+    scrollStand.add(openSutra);
+
+    // Ánh sáng hào quang vàng kim thần thánh
+    const auraLight = new THREE.PointLight(0xffdf80, 2.2, 5.5);
+    auraLight.position.set(0, 0.6, 0);
+    scrollStand.add(auraLight);
+    this.stoneLampLights.push(auraLight);
+
+    openSutra.name = "indoor_tang_kinh_cac_scroll";
+    deskTop.name = "indoor_tang_kinh_cac_desk";
+    this.tangKinhCacMeshes.push(openSutra, deskTop, scrollStand);
+
+    // Đèn hoa sen ngọc bích trên bàn
+    const lotusLamp = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), new THREE.MeshStandardMaterial({
+      color: 0xffe0b2,
+      emissive: 0xffb74d,
+      emissiveIntensity: 0.7,
+      roughness: 0.3
+    }));
+    lotusLamp.position.set(0.1, 0.98, -0.75);
+    deskGroup.add(lotusLamp);
+
+    // Lư trầm bằng đồng
+    const censer = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), goldMat);
+    censer.position.set(0.1, 0.88, 0.75);
+    deskGroup.add(censer);
+
+    // 2 Bồ đoàn lụa vàng trước bàn đọc kinh
+    [-0.6, 0.6].forEach((cz, idx) => {
+      const cushion = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.38, 0.14, 16), cushionSilkMat);
+      cushion.position.set(-1.8, 0.08, cz);
+      cushion.castShadow = true;
+      group.add(cushion);
+
+      const cushionTuft = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), redSilkMat);
+      cushionTuft.position.set(-1.8, 0.16, cz);
+      group.add(cushionTuft);
+
+      cushion.name = `indoor_tkc_cushion_${idx}`;
+      this.tangKinhCacMeshes.push(cushion);
+    });
+
+    this.scene.add(group);
+
+    // Colliders cho Gian Tàng Kinh Các Nội Điện
+    // 1. Kệ sách vách phải: x từ 17.5 đến 18.5, z từ -34.0 đến -28.0
+    this.colliders.push(
+      new THREE.Box3(new THREE.Vector3(17.5, 0, -34.0), new THREE.Vector3(18.5, 6.0, -28.0))
+    );
+    // 2. Bàn đọc kinh: x từ 15.8 đến 17.0, z từ -32.2 đến -29.8
+    this.colliders.push(
+      new THREE.Box3(new THREE.Vector3(15.8, 0, -32.2), new THREE.Vector3(17.0, 2.0, -29.8))
     );
   }
 
