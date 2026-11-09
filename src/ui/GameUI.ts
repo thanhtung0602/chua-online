@@ -39,6 +39,7 @@ import {
   type SutraChapter,
   sutraAudio,
 } from "../utils/sutraLibrary";
+import { APP_VERSION } from "../version";
 
 export interface UIEventCallbacks {
   onActionSelect: (action: string) => void;
@@ -82,6 +83,8 @@ export interface UIEventCallbacks {
   onStopQuestWork?: () => void;
   onQuestStateChange?: () => void;
   onJoystickMove?: (vector: { x: number; y: number }, distance: number) => void;
+  isPlayerSittingOnCushion?: () => boolean;
+  onAutoSitNearestCushion?: () => boolean;
 }
 
 export interface DonationPackageClient {
@@ -196,6 +199,7 @@ export class GameUI {
   private isChantVoiceEnabled: boolean = true;
   private chantSpeedMode: "slow" | "normal" | "fast" = "normal";
   private autoChantTimer?: number;
+  private currentPendingUpdateVersion?: string;
 
   // Trạng thái Khung Đàm Luận (Chat Box)
   private isChatCollapsed: boolean = false;
@@ -1555,6 +1559,9 @@ export class GameUI {
     // 0a. Nút tải lại và đóng Banner Cập Nhật Phiên Bản Mới
     const btnUpdateReload = document.getElementById("btn-update-reload");
     btnUpdateReload?.addEventListener("click", () => {
+      if (this.currentPendingUpdateVersion) {
+        localStorage.setItem("chua_dismissed_update_" + this.currentPendingUpdateVersion, "true");
+      }
       window.location.reload();
     });
 
@@ -1562,6 +1569,9 @@ export class GameUI {
     btnUpdateDismiss?.addEventListener("click", () => {
       const banner = document.getElementById("game-update-banner");
       if (banner) banner.classList.add("hidden");
+      if (this.currentPendingUpdateVersion) {
+        localStorage.setItem("chua_dismissed_update_" + this.currentPendingUpdateVersion, "true");
+      }
     });
 
     // 1. Âm thanh Toggle (Toàn bộ hiệu ứng & nhạc)
@@ -3330,6 +3340,13 @@ export class GameUI {
     if (timeDisplay) timeDisplay.innerText = "00:00";
     const card = document.getElementById("meditate-timer-card");
     if (card) card.classList.add("hidden-card");
+
+    // Tự động dừng phát Pháp Âm tụng kinh Tàng Kinh Các khi rời bồ đoàn
+    if (sutraAudio.getIsPlaying()) {
+      sutraAudio.stop();
+      this.appendChatMessage("Chùa", "🙏 Đã xả thiền rời bồ đoàn, tạm dừng Pháp Âm tụng kinh.");
+    }
+
     this.callbacks.onActionSelect("idle");
   }
 
@@ -4038,11 +4055,20 @@ export class GameUI {
   }
 
   public showUpdateBanner(version?: string, message?: string) {
+    if (!version || version === APP_VERSION) {
+      return; // Không có cập nhật mới hoặc phiên bản máy chủ trùng với bản đang chạy
+    }
+    const dismissed = localStorage.getItem("chua_dismissed_update_" + version);
+    if (dismissed === "true") {
+      return; // Đã thông báo / đã đóng phiên bản này rồi thì không hiện nữa
+    }
+
+    this.currentPendingUpdateVersion = version;
     const banner = document.getElementById("game-update-banner");
     const textEl = document.getElementById("update-banner-text");
     if (banner) {
       if (textEl) {
-        textEl.textContent = message || `🌸 Chùa An Lạc vừa có bản cập nhật mới ${version ? `(v${version})` : ""}! Nhấn để làm mới.`;
+        textEl.textContent = message || `🌸 Chùa An Lạc vừa có bản cập nhật mới (v${version})! Nhấn để làm mới.`;
       }
       banner.classList.remove("hidden");
     }
@@ -5210,6 +5236,30 @@ export class GameUI {
   // ─────────────────────────────────────────────
   // HỆ THỐNG TÀNG KINH CÁC & AUDIO ĐỌC KINH
   // ─────────────────────────────────────────────
+  private ensurePlayerSeatedForAudio(): boolean {
+    // 1. Kiểm tra nếu người chơi đang ngồi trên bồ đoàn rồi
+    const isSeated = this.callbacks.isPlayerSittingOnCushion
+      ? this.callbacks.isPlayerSittingOnCushion()
+      : this.isMeditating;
+
+    if (isSeated) {
+      return true;
+    }
+
+    // 2. Nếu chưa ngồi, thử tự động ngồi vào bồ đoàn trống gần nhất (trong Tàng Kinh Các hoặc Chính Điện)
+    if (this.callbacks.onAutoSitNearestCushion && this.callbacks.onAutoSitNearestCushion()) {
+      return true;
+    }
+
+    // 3. Nếu không ngồi được (đang ở ngoài sân hoặc quá xa):
+    this.appendChatMessage(
+      "Chùa",
+      "🧘 Quý đạo hữu hoan hỷ bước vào Tàng Kinh Các hoặc Chính Điện và ngồi lên bồ đoàn để lắng nghe Pháp Âm tụng kinh thanh tịnh! 🙏"
+    );
+    zenAudio.playSingingBowl(396);
+    return false;
+  }
+
   private bindTangKinhCacEvents() {
     // Đóng Modal Tàng Kinh Các
     document.getElementById("modal-tang-kinh-cac-close")?.addEventListener("click", () => {
@@ -5263,11 +5313,13 @@ export class GameUI {
       if (!this.selectedSutra) return;
       if (sutraAudio.getIsPlaying()) {
         if (sutraAudio.getIsPaused()) {
+          if (!this.ensurePlayerSeatedForAudio()) return;
           sutraAudio.resume();
         } else {
           sutraAudio.pause();
         }
       } else {
+        if (!this.ensurePlayerSeatedForAudio()) return;
         sutraAudio.playSutra(this.selectedSutra, this.currentReaderChapterIdx, 0);
       }
     });
@@ -5484,7 +5536,9 @@ export class GameUI {
             tab.classList.add("active");
             this.renderChapterContent(sutra.chapters[idx], idx);
             if (sutraAudio.getIsPlaying()) {
-              sutraAudio.playSutra(sutra, idx, 0);
+              if (this.ensurePlayerSeatedForAudio()) {
+                sutraAudio.playSutra(sutra, idx, 0);
+              }
             }
           });
         });
@@ -5507,7 +5561,11 @@ export class GameUI {
     }
 
     if (autoPlay) {
-      sutraAudio.playSutra(sutra, this.currentReaderChapterIdx, 0);
+      if (this.ensurePlayerSeatedForAudio()) {
+        sutraAudio.playSutra(sutra, this.currentReaderChapterIdx, 0);
+      } else if (audioVerse) {
+        audioVerse.innerText = "Đạo hữu hãy ngồi lên bồ đoàn để lắng nghe Pháp Âm";
+      }
     }
   }
 
@@ -5533,6 +5591,7 @@ export class GameUI {
       item.addEventListener("click", () => {
         const vIdx = Number((item as HTMLElement).dataset.verseIdx);
         if (this.selectedSutra) {
+          if (!this.ensurePlayerSeatedForAudio()) return;
           sutraAudio.playSutra(this.selectedSutra, chapterIdx, vIdx);
         }
       });

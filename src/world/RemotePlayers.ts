@@ -561,6 +561,22 @@ export class RemotePlayersManager {
       return 0.65;
     }
 
+    // 3.1. Sàn Tòa Đại Tạng Kinh Điện — Tàng Kinh Các Đồ Sộ (Walk-in floor y = 0.65m)
+    if (x >= 24.5 && x <= 45.5 && z >= -41.5 && z <= -14.5) {
+      return 0.65;
+    }
+
+    // 3.2. Cầu Hành Lang Có Mái Che Nối Chính Điện & Tàng Kinh Các (Walk-in corridor y = 0.65m)
+    if (x >= 19.5 && x <= 25.0 && z >= -29.8 && z <= -26.2) {
+      return 0.65;
+    }
+
+    // 3.3. Bậc tam cấp trước tiền sảnh Tàng Kinh Các (chuyển tiếp nhịp nhàng từ 0 lên 0.65)
+    if (x >= 29.5 && x <= 40.5 && z > -14.5 && z <= -12.5) {
+      const progress = (-12.5 - z) / 2.0;
+      return Math.max(0, Math.min(0.65, progress * 0.65));
+    }
+
     // 4. Bậc ngũ cấp trước cửa chính điện (chuyển tiếp nhịp nhàng từ 0 lên 0.65, rộng 16m)
     if (z > -13.0 && z <= -11.0 && Math.abs(x) <= 8.2) {
       const progress = (-11.0 - z) / 2.0;

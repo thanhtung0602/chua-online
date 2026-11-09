@@ -28,6 +28,7 @@ import { GameUI } from "./ui/GameUI";
 import { generateUniqueGuestName } from "./utils/nameGenerator";
 import { authService } from "./services/authService";
 import { templeQuestManager } from "./utils/templeQuestSystem";
+import { APP_VERSION } from "./version";
 
 class ChuaAnLacGame {
   // Three.js Core
@@ -683,7 +684,7 @@ class ChuaAnLacGame {
           this.speechBubbles.show(this.player.group, "A Di Đà Phật! Chiêm bái Lầu Chuông Đại Hồng Chung 🙏");
         } else if (location === "tang_kinh_cac") {
           // Đến trước bậc thềm Tòa Tàng Kinh Các bên phải Chính Điện (x = 35.0, z = -14.0)
-          this.player.teleportTo(35.0, -14.0, 0.0, 0);
+          this.player.teleportTo(35.0, -14.0, 0.65, 0);
           this.cameraYaw = 0;
           this.targetYaw = 0;
           this.targetDistance = 10.5;
@@ -946,6 +947,33 @@ class ChuaAnLacGame {
       onQuestStateChange: () => {
         const curQ = templeQuestManager.getActiveQuest();
         this.questZones.updateActiveQuest(curQ, templeQuestManager.isWorkDone());
+      },
+      isPlayerSittingOnCushion: () => {
+        return Boolean(this.currentOccupiedSeat) || this.player.action === "meditate" || (this.gameUI && this.gameUI.getIsMeditating());
+      },
+      onAutoSitNearestCushion: () => {
+        if (this.currentOccupiedSeat || this.player.action === "meditate" || (this.gameUI && this.gameUI.getIsMeditating())) {
+          return true;
+        }
+        // Tìm bồ đoàn còn trống gần nhất trong khuôn viên (Tàng Kinh Các hoặc Chính Điện trong bán kính 35m)
+        const candidates = this.world.cushionPositions
+          .filter((c) => Boolean(c.name) && c.name !== "seat_abbot" && !c.name!.startsWith("seat_senior_monk_"))
+          .map((c) => ({
+            seat: c,
+            name: c.name!,
+            dist: Math.hypot(c.x - this.player.worldX, c.z - this.player.worldZ),
+          }))
+          .filter((item) => item.dist <= 35.0)
+          .sort((a, b) => a.dist - b.dist);
+
+        for (const item of candidates) {
+          const occupant = network.getSeatOccupant(item.name);
+          if (!occupant) {
+            this.tryOccupySeat(item.name, item.seat.x, item.seat.z, item.seat.y);
+            return true;
+          }
+        }
+        return false;
       },
     });
 
@@ -1276,9 +1304,8 @@ class ChuaAnLacGame {
     network.requestLeaderboard();
 
     // Hook thông báo cập nhật phiên bản máy chủ mới (Zero-downtime client notification)
-    const CLIENT_VERSION = "1.1.0";
     network.setOnUpdateAvailable((data) => {
-      if (data && data.version && data.version !== CLIENT_VERSION) {
+      if (data && data.version && data.version !== APP_VERSION) {
         this.gameUI.showUpdateBanner(data.version, data.message);
       }
     });
@@ -1288,7 +1315,7 @@ class ChuaAnLacGame {
         const res = await fetch("/api/version");
         if (res.ok) {
           const data = await res.json();
-          if (data && data.version && data.version !== CLIENT_VERSION) {
+          if (data && data.version && data.version !== APP_VERSION) {
             this.gameUI.showUpdateBanner(data.version);
           }
         }
@@ -1438,6 +1465,10 @@ class ChuaAnLacGame {
     const prevSeat = this.currentOccupiedSeat;
     this.currentOccupiedSeat = null;
     network.leaveSeat();
+
+    if (this.gameUI && this.gameUI.getIsMeditating()) {
+      this.gameUI.stopMeditation();
+    }
 
     const groundH = this.player.getGroundHeight(this.player.worldX, this.player.worldZ);
     this.player.worldY = groundH;
