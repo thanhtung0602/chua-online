@@ -677,14 +677,14 @@ class ChuaAnLacGame {
           zenAudio.playSingingBowl(528);
           this.speechBubbles.show(this.player.group, "A Di Đà Phật! Chiêm bái Lầu Chuông Đại Hồng Chung 🙏");
         } else if (location === "tang_kinh_cac") {
-          // Đến trước bậc thềm Tòa Tàng Kinh Các bên phải Chính Điện
-          this.player.teleportTo(10.5, -6.5, 0, Math.PI);
+          // Đến trước bậc thềm Tòa Tàng Kinh Các bên phải Chính Điện (x = 35.0, z = -14.0)
+          this.player.teleportTo(35.0, -14.0, 0.0, 0);
           this.cameraYaw = 0;
           this.targetYaw = 0;
-          this.targetDistance = 9.5;
+          this.targetDistance = 10.5;
           this.targetPitch = 0.28;
           zenAudio.playSingingBowl(528);
-          this.speechBubbles.show(this.player.group, "A Di Đà Phật! Quang lâm Tòa Tàng Kinh Các — Kho Tàng Pháp Bảo 🙏");
+          this.speechBubbles.show(this.player.group, "A Di Đà Phật! Quang lâm Đại Tạng Kinh Điện — Kho Tàng Pháp Bảo 🙏");
         }
       },
       onTeleportToCoords: (x, z, y = 0, locationName) => {
@@ -1382,7 +1382,8 @@ class ChuaAnLacGame {
     const targetX = seat ? seat.x : (fallbackX ?? 0);
     const targetZ = seat ? seat.z : (fallbackZ ?? -18.0);
     const targetY = seat ? seat.y : (fallbackY ?? 0.74);
-    const facing = seatName === "seat_abbot" ? 0 : Math.PI;
+    const isTKC = seatName.startsWith("seat_tkc_");
+    const facing = seatName === "seat_abbot" || isTKC ? 0 : Math.PI;
 
     this.currentOccupiedSeat = seatName;
     this.player.teleportTo(targetX, targetZ, targetY, facing);
@@ -1402,6 +1403,12 @@ class ChuaAnLacGame {
         this.speechBubbles.show(this.player.group, `👑 Hòa Thượng Trụ Trì quang lâm thăm hỏi Chư Tôn Đức Cao Tăng! 🙏`);
       } else {
         this.speechBubbles.show(this.player.group, `🪷 Tọa thiền trang nghiêm tại Pháp Tòa Cao Tăng #${rank}! 🙏`);
+      }
+    } else if (isTKC) {
+      this.speechBubbles.show(this.player.group, "📖 Tọa thiền an nhiên đọc tụng kinh điển nơi Tòa Tàng Kinh Các... 🙏");
+      const activeQuest = templeQuestManager.getActiveQuest();
+      if (activeQuest && activeQuest.id === "tidy_cushions") {
+        this.gameUI.completeQuest();
       }
     } else {
       this.speechBubbles.show(this.player.group, "🧘 Tọa thiền an nhiên trên bồ đoàn trước Tam Thế Phật...");
@@ -1538,10 +1545,16 @@ class ChuaAnLacGame {
       );
     }
 
-    // 10.9. Cập nhật Prompt Tòa Tàng Kinh Các khi đứng gần (cả Tòa Tháp ngoài sân và Gian Tàng Kinh trong Chính Điện)
-    const distOutdoor = Math.hypot(this.player.worldX - 10.5, this.player.worldZ - (-10.0));
-    const distIndoor = Math.hypot(this.player.worldX - 16.5, this.player.worldZ - (-31.0));
-    this.gameUI.updateTangKinhCacPrompt(distOutdoor < 4.2 || distIndoor < 4.2);
+    // 10.9. Cập nhật Prompt Tòa Tàng Kinh Các khi đứng gần hoặc đang bước vào Tòa Tàng Kinh Các / Cầu nối / Bàn kinh
+    const distPalaceCenter = Math.hypot(this.player.worldX - 35.0, this.player.worldZ - (-28.0));
+    const distWalkway = Math.hypot(this.player.worldX - 22.5, this.player.worldZ - (-28.0));
+    const distEntrance = Math.hypot(this.player.worldX - 35.0, this.player.worldZ - (-14.0));
+    const isNearTKC =
+      (this.player.worldX >= 23.5 && this.player.worldX <= 46.5 && this.player.worldZ >= -42.0 && this.player.worldZ <= -13.0) ||
+      distWalkway < 3.5 ||
+      distEntrance < 4.5 ||
+      distPalaceCenter < 14.5;
+    this.gameUI.updateTangKinhCacPrompt(isNearTKC);
 
     // 11. Cập nhật bong bóng thoại
     this.speechBubbles.update();

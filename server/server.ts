@@ -279,7 +279,7 @@ const app = express();
 const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3001;
-const APP_VERSION = process.env.APP_VERSION || "1.1.0";
+const APP_VERSION = process.env.APP_VERSION || "1.2.0";
 
 app.use(cors());
 app.use(express.json());
@@ -1150,7 +1150,7 @@ io.on("connection", (socket: Socket) => {
   socket.emit("server:version", { version: APP_VERSION });
   socket.emit("server:update_available", {
     version: APP_VERSION,
-    message: "🌸 Đã khai mở Tòa Tàng Kinh Các & Pháp Âm! Nhấn để làm mới trang.",
+    message: "🌸 Đã mở rộng Đại Tạng Kinh Điện đồ sộ (24 bồ đoàn, hành lang nối Chính Điện & tối ưu di động)! Nhấn để làm mới trang.",
   });
 
   // Gửi ngay số người đang cùng chiêm bái
