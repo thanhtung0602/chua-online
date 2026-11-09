@@ -441,6 +441,15 @@ class ChuaAnLacGame {
       }
     }
 
+    // 2.6. Kiểm tra click vào Tòa Tàng Kinh Các (Kinh Thư, Bàn Đọc, Kệ Sách, Biển Hiệu)
+    if (this.world.tangKinhCacMeshes && this.world.tangKinhCacMeshes.length > 0) {
+      const tkcHits = this.raycaster.intersectObjects(this.world.tangKinhCacMeshes, true);
+      if (tkcHits.length > 0) {
+        this.gameUI.openTangKinhCacModal();
+        return;
+      }
+    }
+
     // 3. Kiểm tra click vào Bồ Đoàn / Pháp Tòa trong Chính Điện
     if (this.player.action === "meditate" || this.gameUI.getIsMeditating()) {
       // Đang ngồi thiền mà click chạm màn hình -> Xả thiền, đứng dậy thoát khỏi chỗ ngồi
@@ -667,6 +676,15 @@ class ChuaAnLacGame {
           this.targetPitch = 0.28;
           zenAudio.playSingingBowl(528);
           this.speechBubbles.show(this.player.group, "A Di Đà Phật! Chiêm bái Lầu Chuông Đại Hồng Chung 🙏");
+        } else if (location === "tang_kinh_cac") {
+          // Đến trước bậc thềm Tòa Tàng Kinh Các bên phải Chính Điện
+          this.player.teleportTo(10.5, -6.5, 0, Math.PI);
+          this.cameraYaw = 0;
+          this.targetYaw = 0;
+          this.targetDistance = 9.5;
+          this.targetPitch = 0.28;
+          zenAudio.playSingingBowl(528);
+          this.speechBubbles.show(this.player.group, "A Di Đà Phật! Quang lâm Tòa Tàng Kinh Các — Kho Tàng Pháp Bảo 🙏");
         }
       },
       onTeleportToCoords: (x, z, y = 0, locationName) => {
@@ -1517,6 +1535,10 @@ class ChuaAnLacGame {
         zoneCheck.isWorkDone
       );
     }
+
+    // 10.9. Cập nhật Prompt Tòa Tàng Kinh Các khi đứng gần (bên phải Chính Điện)
+    const distToTKC = Math.hypot(this.player.worldX - 10.5, this.player.worldZ - (-10.0));
+    this.gameUI.updateTangKinhCacPrompt(distToTKC < 4.2);
 
     // 11. Cập nhật bong bóng thoại
     this.speechBubbles.update();

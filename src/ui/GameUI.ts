@@ -33,6 +33,12 @@ import {
   QUEST_REWARD_POINTS,
   type TempleQuest,
 } from "../utils/templeQuestSystem";
+import {
+  SUTRA_DATABASE,
+  type Sutra,
+  type SutraChapter,
+  sutraAudio,
+} from "../utils/sutraLibrary";
 
 export interface UIEventCallbacks {
   onActionSelect: (action: string) => void;
@@ -48,7 +54,7 @@ export interface UIEventCallbacks {
   onWaterGarden?: () => void;
   onHarvestGarden?: () => void;
   onTeleport?: (
-    location: "main_hall" | "courtyard" | "gate" | "pond" | "garden" | "bell",
+    location: "main_hall" | "courtyard" | "gate" | "pond" | "garden" | "bell" | "tang_kinh_cac",
   ) => void;
   onTeleportToCoords?: (x: number, z: number, y?: number, locationName?: string) => void;
   getPlayerPosition?: () => { x: number; z: number };
@@ -162,6 +168,14 @@ export class GameUI {
   private meditateInterval: number | null = null;
   private isMuted: boolean = false;
   private selectedOracleCategory: OracleCategory = "love";
+
+  // Tàng Kinh Các (Scripture Library & Audio) State
+  private selectedSutra: Sutra | null = null;
+  private currentSutraCategory: string = "all";
+  private sutraFontSize: number = 18;
+  private isSutraParchmentTheme: boolean = true;
+  public isNearTangKinhCac: boolean = false;
+  private currentReaderChapterIdx: number = 0;
   private currentOracleStick: OracleStick | null = null;
   private isShakingOracle: boolean = false;
   public playerName: string = authService.isLoggedIn()
@@ -256,6 +270,7 @@ export class GameUI {
                   <button class="nav-btn" data-teleport="pond" title="Ra cầu gỗ hồ sen">🪷 Cầu Hồ Sen</button>
                   <button class="nav-btn" data-teleport="garden" title="Đến khu vườn hoa">🌿 Vườn An Lạc</button>
                   <button class="nav-btn" data-teleport="bell" title="Đến Lầu Chuông Đại Hồng Chung & Chú Tiểu Trí Tuệ">🔔 Lầu Chuông</button>
+                  <button class="nav-btn highlight-gold" data-teleport="tang_kinh_cac" title="Đến Tòa Tàng Kinh Các - Đọc & Nghe Kinh Điển Phật Giáo">📚 Tàng Kinh Các</button>
                   <button class="nav-btn" id="btn-wardrobe" title="Chọn nhân vật Nam / Nữ và Y phục Phật tử">👤 Nhân Vật</button>
                   <button class="nav-btn highlight-gold" id="btn-leaderboard" title="Bảng Xếp Hạng Công Đức & Vị Trí Trụ Trì">🏆 Bảng Xếp Hạng</button>
                   <button class="nav-btn highlight-gold" id="btn-menu-donation" title="Cúng Dường Hòm Công Đức Tam Bảo - Mua Điểm Công Đức">🪷 Hòm Công Đức</button>
@@ -350,6 +365,21 @@ export class GameUI {
           <button type="button" class="qap-btn" id="btn-qap-start">
             <span class="qap-btn-icon">⚡</span>
             <span class="qap-btn-text" id="qap-btn-text">Thực Hiện (10s)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- FLOATING TÀNG KINH CÁC PROMPT (XUẤT HIỆN KHI ĐẾN GẦN TÒA TÀNG KINH CÁC) -->
+      <div id="tang-kinh-cac-prompt" class="quest-action-prompt tkc-floating-prompt hidden">
+        <div class="qap-bubble">
+          <div class="qap-icon">📚</div>
+          <div class="qap-info">
+            <div class="qap-title">Tòa Tàng Kinh Các · 藏經閣</div>
+            <div class="qap-sub">Nhấn phím [E] hoặc bấm nút để mở Kinh Điển</div>
+          </div>
+          <button type="button" class="qap-btn tkc-prompt-btn" id="btn-tkc-prompt-open">
+            <span class="qap-btn-icon">📜</span>
+            <span class="qap-btn-text">Đọc & Nghe Kinh</span>
           </button>
         </div>
       </div>
@@ -1356,6 +1386,132 @@ export class GameUI {
         </div>
       </div>
 
+      <!-- MODAL: TÀNG KINH CÁC — KHO TÀNG PHÁP BẢO PHẬT GIÁO -->
+      <div id="modal-tang-kinh-cac" class="modal-backdrop hidden">
+        <div class="modal-box tang-kinh-cac-modal-box">
+          <!-- MODAL HEADER -->
+          <div class="modal-header tkc-modal-header">
+            <div class="tkc-title-group">
+              <span class="tkc-icon-badge">📚</span>
+              <div class="tkc-titles">
+                <h3>TÀNG KINH CÁC · 藏 經 閣</h3>
+                <span class="tkc-sub">Kho Tàng Pháp Bảo Phật Giáo · Đọc Kinh & Lắng Nghe Pháp Âm</span>
+              </div>
+            </div>
+            <div class="tkc-header-tools">
+              <button class="modal-close" id="modal-tang-kinh-cac-close">✕</button>
+            </div>
+          </div>
+
+          <!-- MODAL BODY -->
+          <div class="modal-body tkc-modal-body">
+            <!-- VIEW A: DANH MỤC CÁC BỘ KINH (CATALOG VIEW) -->
+            <div id="tkc-catalog-view" class="tkc-view">
+              <div class="tkc-banner">
+                <div class="tkc-banner-icon">📜</div>
+                <div class="tkc-banner-content">
+                  <div class="tkc-banner-heading">Pháp Bảo Bất Diệt — Ngọn Đèn Soi Sáng Thế Gian</div>
+                  <div class="tkc-banner-desc">
+                    Tòa Tàng Kinh Các lưu trữ những bộ kinh điển tối thượng của Đức Bổn Sư Thích Ca Mâu Ni và chư Đại Bồ Tát. Quý đạo hữu có thể chọn đọc từng phẩm kinh thiền vị hoặc lắng nghe giọng đọc thanh tịnh truyền cảm kết hợp tiếng chuông mõ gia trì.
+                  </div>
+                </div>
+              </div>
+
+              <!-- BỘ LỌC THỂ LOẠI -->
+              <div class="tkc-filter-bar" id="tkc-filter-bar">
+                <button type="button" class="tkc-filter-chip active" data-category="all">✨ Tất Cả (8)</button>
+                <button type="button" class="tkc-filter-chip" data-category="wisdom">💎 Trí Tuệ Bát Nhã</button>
+                <button type="button" class="tkc-filter-chip" data-category="dharma">🪷 Kinh Căn Bản</button>
+                <button type="button" class="tkc-filter-chip" data-category="compassion">🌊 Cứu Khổ Cứu Nạn</button>
+                <button type="button" class="tkc-filter-chip" data-category="pureland">🛕 Tịnh Độ Cực Lạc</button>
+                <button type="button" class="tkc-filter-chip" data-category="healing">🌿 Tiêu Tai Diên Thọ</button>
+                <button type="button" class="tkc-filter-chip" data-category="filial_piety">🕯️ Đạo Hiếu Vu Lan</button>
+              </div>
+
+              <!-- LƯỚI DANH SÁCH BỘ KINH -->
+              <div class="tkc-sutra-grid" id="tkc-sutra-grid">
+                <!-- SUTRA CARDS RENDERED DYNAMICALLY -->
+              </div>
+            </div>
+
+            <!-- VIEW B: PHÒNG ĐỌC KINH & NGHE PHÁP ÂM (READER & AUDIO VIEW) -->
+            <div id="tkc-reader-view" class="tkc-view hidden">
+              <!-- TOP BREADCRUMB & CONTROLS -->
+              <div class="tkc-reader-top-bar">
+                <button type="button" class="tkc-back-btn" id="btn-tkc-back-catalog">
+                  <span>←</span> Quay Lại Danh Mục Kinh
+                </button>
+                <div class="tkc-reader-actions">
+                  <button type="button" class="tkc-font-btn" id="btn-tkc-font-decrease" title="Giảm cỡ chữ">A-</button>
+                  <button type="button" class="tkc-font-btn" id="btn-tkc-font-increase" title="Tăng cỡ chữ">A+</button>
+                  <button type="button" class="tkc-font-btn" id="btn-tkc-theme-toggle" title="Đổi màu nền Giấy Cổ / Đêm">📜 Nền Giấy</button>
+                </div>
+              </div>
+
+              <!-- READER CONTENT CONTAINER -->
+              <div class="tkc-reader-scrollable" id="tkc-reader-scrollable">
+                <div class="tkc-parchment-sheet" id="tkc-parchment-sheet">
+                  <!-- SUTRA METADATA HEADER -->
+                  <div class="tkc-sheet-header">
+                    <div class="tkc-sheet-lotus-ornament">❖ ❖ ❖</div>
+                    <h2 class="tkc-sheet-title" id="tkc-reader-title">Bát Nhã Ba La Mật Đa Tâm Kinh</h2>
+                    <div class="tkc-sheet-sanskrit" id="tkc-reader-sanskrit">Prajñāpāramitā Hṛdaya Sūtra</div>
+                    <div class="tkc-sheet-desc" id="tkc-reader-desc">...</div>
+                    <div class="tkc-sheet-divider"></div>
+                  </div>
+
+                  <!-- CHAPTER TABS IF MULTI-CHAPTER -->
+                  <div class="tkc-chapter-tabs" id="tkc-chapter-tabs">
+                    <!-- Dynamic Chapter Tabs -->
+                  </div>
+
+                  <!-- CHAPTER HEADING -->
+                  <div class="tkc-current-chapter-title" id="tkc-current-chapter-title">
+                    Phẩm I: Song Yếu
+                  </div>
+
+                  <!-- VERSES LIST -->
+                  <div class="tkc-verses-flow" id="tkc-verses-flow">
+                    <!-- Dynamic verse paragraphs with click-to-play -->
+                  </div>
+
+                  <!-- MERIT REWARD CARD AT END OF SUTRA -->
+                  <div class="tkc-merit-card">
+                    <div class="tkc-merit-icon">🌸</div>
+                    <div class="tkc-merit-content">
+                      <div class="tkc-merit-title">Công Đức Thù Thắng</div>
+                      <div class="tkc-merit-text" id="tkc-merit-text">...</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- FLOATING AUDIO CONTROLLER DOCK -->
+              <div class="tkc-audio-dock" id="tkc-audio-dock">
+                <div class="tkc-audio-info">
+                  <span class="tkc-audio-pulse" id="tkc-audio-pulse">🔊</span>
+                  <div class="tkc-audio-meta">
+                    <div class="tkc-audio-sutra-name" id="tkc-audio-name">Đang nghe kinh...</div>
+                    <div class="tkc-audio-verse-text" id="tkc-audio-current-verse">Nhấn Phát để nghe đọc kinh</div>
+                  </div>
+                </div>
+
+                <div class="tkc-audio-controls">
+                  <button type="button" class="tkc-audio-btn tkc-prev-btn" id="btn-tkc-audio-prev" title="Câu trước">⏮</button>
+                  <button type="button" class="tkc-audio-btn tkc-play-btn" id="btn-tkc-audio-play" title="Phát / Dừng">▶</button>
+                  <button type="button" class="tkc-audio-btn tkc-next-btn" id="btn-tkc-audio-next" title="Câu tiếp theo">⏭</button>
+                </div>
+
+                <div class="tkc-audio-extras">
+                  <button type="button" class="tkc-speed-btn" id="btn-tkc-audio-speed" title="Tốc độ đọc">0.95x</button>
+                  <button type="button" class="tkc-chime-btn active" id="btn-tkc-audio-chime" title="Bật/Tắt chuông mõ">🔔 Chuông</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- CẦN GẠT DI CHUYỂN CẢM ỨNG ẢO (VIRTUAL ANALOG JOYSTICK - PHONG CÁCH LIÊN QUÂN MOBILE) -->
       <div class="virtual-joystick-zone" id="virtual-joystick-zone">
         <div class="joystick-base" id="joystick-base">
@@ -1720,7 +1876,8 @@ export class GameUI {
           | "gate"
           | "pond"
           | "garden"
-          | "bell";
+          | "bell"
+          | "tang_kinh_cac";
         if (loc && this.callbacks.onTeleport) {
           this.callbacks.onTeleport(loc);
         }
@@ -2529,10 +2686,24 @@ export class GameUI {
           }
         }
       }
+
+      // Phím tắt E: Mở Tàng Kinh Các khi đứng gần tòa tháp
+      if (e.key.toLowerCase() === "e") {
+        if (this.isNearTangKinhCac) {
+          const modal = document.getElementById("modal-tang-kinh-cac");
+          if (!modal || modal.classList.contains("hidden")) {
+            this.openTangKinhCacModal();
+          }
+        }
+      }
     });
 
     // Khởi tạo hiển thị tracker ban đầu
     this.updateFloatingQuestTracker();
+
+    // Khởi tạo sự kiện Tàng Kinh Các & Audio đọc kinh
+    this.bindTangKinhCacEvents();
+    this.setupSutraAudioSync();
   }
 
   // ─────────────────────────────────────────────
@@ -5044,6 +5215,358 @@ export class GameUI {
           `🌸 Quý đạo hữu đã cúng dường thành công ${Number(data.amount).toLocaleString("vi-VN")}đ, nhận được +${pts.toLocaleString("vi-VN")} Điểm Công Đức! A Di Đà Phật 🙏`
         );
       }
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // HỆ THỐNG TÀNG KINH CÁC & AUDIO ĐỌC KINH
+  // ─────────────────────────────────────────────
+  private bindTangKinhCacEvents() {
+    // Đóng Modal Tàng Kinh Các
+    document.getElementById("modal-tang-kinh-cac-close")?.addEventListener("click", () => {
+      this.closeTangKinhCacModal();
+    });
+
+    const modalTKC = document.getElementById("modal-tang-kinh-cac");
+    modalTKC?.addEventListener("click", (e) => {
+      if (e.target === modalTKC) {
+        this.closeTangKinhCacModal();
+      }
+    });
+
+    // Nút mở từ prompt hiện trường
+    document.getElementById("btn-tkc-prompt-open")?.addEventListener("click", () => {
+      this.openTangKinhCacModal();
+    });
+
+    // Nút quay lại danh mục từ phòng đọc
+    document.getElementById("btn-tkc-back-catalog")?.addEventListener("click", () => {
+      this.switchTangKinhCacView("catalog");
+    });
+
+    // Nút điều chỉnh cỡ chữ
+    document.getElementById("btn-tkc-font-decrease")?.addEventListener("click", () => {
+      this.changeSutraFontSize(-2);
+    });
+    document.getElementById("btn-tkc-font-increase")?.addEventListener("click", () => {
+      this.changeSutraFontSize(2);
+    });
+
+    // Nút đổi giao diện nền giấy / ban đêm
+    document.getElementById("btn-tkc-theme-toggle")?.addEventListener("click", () => {
+      this.toggleSutraTheme();
+    });
+
+    // Bộ lọc thể loại
+    const filterChips = document.querySelectorAll("#tkc-filter-bar .tkc-filter-chip");
+    filterChips.forEach((chip) => {
+      chip.addEventListener("click", () => {
+        filterChips.forEach((c) => c.classList.remove("active"));
+        chip.classList.add("active");
+        const cat = chip.getAttribute("data-category") || "all";
+        this.currentSutraCategory = cat;
+        this.renderSutraCatalog(cat);
+      });
+    });
+
+    // Audio Controls
+    document.getElementById("btn-tkc-audio-play")?.addEventListener("click", () => {
+      if (!this.selectedSutra) return;
+      if (sutraAudio.getIsPlaying()) {
+        if (sutraAudio.getIsPaused()) {
+          sutraAudio.resume();
+        } else {
+          sutraAudio.pause();
+        }
+      } else {
+        sutraAudio.playSutra(this.selectedSutra, this.currentReaderChapterIdx, 0);
+      }
+    });
+
+    document.getElementById("btn-tkc-audio-prev")?.addEventListener("click", () => {
+      sutraAudio.prevVerse();
+    });
+
+    document.getElementById("btn-tkc-audio-next")?.addEventListener("click", () => {
+      sutraAudio.nextVerse();
+    });
+
+    // Tốc độ đọc (0.8x -> 0.95x -> 1.15x)
+    const speedBtn = document.getElementById("btn-tkc-audio-speed");
+    let speedIdx = 1;
+    const speeds = [0.8, 0.95, 1.15];
+    speedBtn?.addEventListener("click", () => {
+      speedIdx = (speedIdx + 1) % speeds.length;
+      const spd = speeds[speedIdx];
+      sutraAudio.setPlaybackRate(spd);
+      if (speedBtn) speedBtn.innerText = `${spd}x`;
+    });
+
+    // Bật/tắt tiếng chuông điểm kệ
+    const chimeBtn = document.getElementById("btn-tkc-audio-chime");
+    chimeBtn?.addEventListener("click", () => {
+      const active = sutraAudio.toggleChime();
+      chimeBtn.classList.toggle("active", active);
+    });
+  }
+
+  private setupSutraAudioSync() {
+    sutraAudio.onStateChange = (state) => {
+      const playBtn = document.getElementById("btn-tkc-audio-play");
+      const pulseIcon = document.getElementById("tkc-audio-pulse");
+      const audioName = document.getElementById("tkc-audio-name");
+      const audioVerse = document.getElementById("tkc-audio-current-verse");
+
+      if (playBtn) {
+        playBtn.innerText = state.isPlaying && !state.isPaused ? "⏸" : "▶";
+      }
+      if (pulseIcon) {
+        pulseIcon.classList.toggle("playing", state.isPlaying && !state.isPaused);
+      }
+      if (audioName && state.sutra) {
+        audioName.innerText = `${state.sutra.title} (${state.sutra.chapters[state.chapterIdx]?.title || ""})`;
+      }
+      if (audioVerse) {
+        audioVerse.innerText = state.currentText || "Nhấn Phát để nghe đọc kinh";
+      }
+
+      // Làm nổi bật câu kinh đang đọc trên màn hình
+      const allVerses = document.querySelectorAll(".tkc-verse-item");
+      allVerses.forEach((el) => el.classList.remove("active-reading"));
+
+      const activeEl = document.querySelector(`.tkc-verse-item[data-verse-idx="${state.verseIdx}"]`);
+      if (activeEl) {
+        activeEl.classList.add("active-reading");
+        if (state.isPlaying && !state.isPaused) {
+          activeEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    };
+  }
+
+  public updateTangKinhCacPrompt(isNear: boolean) {
+    this.isNearTangKinhCac = isNear;
+    const promptEl = document.getElementById("tang-kinh-cac-prompt");
+    if (!promptEl) return;
+    const modalEl = document.getElementById("modal-tang-kinh-cac");
+    const isModalOpen = modalEl && !modalEl.classList.contains("hidden");
+
+    if (isNear && !isModalOpen) {
+      promptEl.classList.remove("hidden");
+    } else {
+      promptEl.classList.add("hidden");
+    }
+  }
+
+  public openTangKinhCacModal(sutraId?: string) {
+    const modal = document.getElementById("modal-tang-kinh-cac");
+    if (!modal) return;
+    this.closeTeleportMenu();
+    modal.classList.remove("hidden");
+    zenAudio.playLotusSound();
+
+    const promptEl = document.getElementById("tang-kinh-cac-prompt");
+    if (promptEl) promptEl.classList.add("hidden");
+
+    if (sutraId) {
+      const s = SUTRA_DATABASE.find((item) => item.id === sutraId);
+      if (s) {
+        this.openSutraReader(s, 0, false);
+        return;
+      }
+    }
+
+    this.switchTangKinhCacView("catalog");
+    this.renderSutraCatalog(this.currentSutraCategory);
+  }
+
+  public closeTangKinhCacModal() {
+    const modal = document.getElementById("modal-tang-kinh-cac");
+    if (modal) modal.classList.add("hidden");
+  }
+
+  public switchTangKinhCacView(view: "catalog" | "reader") {
+    const catView = document.getElementById("tkc-catalog-view");
+    const readerView = document.getElementById("tkc-reader-view");
+    if (!catView || !readerView) return;
+
+    if (view === "catalog") {
+      catView.classList.remove("hidden");
+      readerView.classList.add("hidden");
+    } else {
+      catView.classList.add("hidden");
+      readerView.classList.remove("hidden");
+    }
+  }
+
+  public renderSutraCatalog(filterCategory = "all") {
+    const grid = document.getElementById("tkc-sutra-grid");
+    if (!grid) return;
+
+    const filtered = filterCategory === "all"
+      ? SUTRA_DATABASE
+      : SUTRA_DATABASE.filter((s) => s.category === filterCategory);
+
+    grid.innerHTML = filtered.map((sutra) => `
+      <div class="tkc-sutra-card" data-sutra-id="${sutra.id}">
+        <div class="tkc-card-cover" style="background: ${sutra.coverColor}">
+          <span class="tkc-card-icon">${sutra.icon}</span>
+        </div>
+        <div class="tkc-card-content">
+          <div class="tkc-card-badges">
+            <span class="tkc-category-badge">${sutra.categoryLabel}</span>
+            <span class="tkc-time-badge">⏱️ ${sutra.readingMinutes} phút</span>
+          </div>
+          <h4 class="tkc-card-title">${sutra.title}</h4>
+          <div class="tkc-card-sanskrit">${sutra.sanskritTitle}</div>
+          <p class="tkc-card-desc">${sutra.description}</p>
+          <div class="tkc-card-actions">
+            <button type="button" class="tkc-action-read" data-action="read" data-sutra-id="${sutra.id}">
+              📖 Đọc Kinh
+            </button>
+            <button type="button" class="tkc-action-listen" data-action="listen" data-sutra-id="${sutra.id}">
+              🎧 Nghe Audio
+            </button>
+          </div>
+        </div>
+      </div>
+    `).join("");
+
+    // Gắn sự kiện click vào các nút trên thẻ kinh
+    grid.querySelectorAll(".tkc-action-read").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const id = (btn as HTMLElement).dataset.sutraId;
+        const s = SUTRA_DATABASE.find((item) => item.id === id);
+        if (s) this.openSutraReader(s, 0, false);
+      });
+    });
+
+    grid.querySelectorAll(".tkc-action-listen").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const id = (btn as HTMLElement).dataset.sutraId;
+        const s = SUTRA_DATABASE.find((item) => item.id === id);
+        if (s) this.openSutraReader(s, 0, true);
+      });
+    });
+
+    grid.querySelectorAll(".tkc-sutra-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        const id = (card as HTMLElement).dataset.sutraId;
+        const s = SUTRA_DATABASE.find((item) => item.id === id);
+        if (s) this.openSutraReader(s, 0, false);
+      });
+    });
+  }
+
+  public openSutraReader(sutra: Sutra, chapterIdx = 0, autoPlay = false) {
+    this.selectedSutra = sutra;
+    this.currentReaderChapterIdx = Math.max(0, Math.min(sutra.chapters.length - 1, chapterIdx));
+    this.switchTangKinhCacView("reader");
+
+    // Đổ dữ liệu tiêu đề và ý nghĩa kinh
+    const titleEl = document.getElementById("tkc-reader-title");
+    const sanskritEl = document.getElementById("tkc-reader-sanskrit");
+    const descEl = document.getElementById("tkc-reader-desc");
+    const meritEl = document.getElementById("tkc-merit-text");
+
+    if (titleEl) titleEl.innerText = sutra.title;
+    if (sanskritEl) sanskritEl.innerText = sutra.sanskritTitle;
+    if (descEl) descEl.innerText = sutra.description;
+    if (meritEl) meritEl.innerText = sutra.meritExplanation;
+
+    // Render danh sách chapter tabs
+    const tabsContainer = document.getElementById("tkc-chapter-tabs");
+    if (tabsContainer) {
+      if (sutra.chapters.length > 1) {
+        tabsContainer.classList.remove("hidden");
+        tabsContainer.innerHTML = sutra.chapters.map((ch, idx) => `
+          <button type="button" class="tkc-chapter-tab ${idx === this.currentReaderChapterIdx ? "active" : ""}" data-chapter-idx="${idx}">
+            ${ch.title.split(":")[0]}
+          </button>
+        `).join("");
+
+        tabsContainer.querySelectorAll(".tkc-chapter-tab").forEach((tab) => {
+          tab.addEventListener("click", () => {
+            const idx = Number((tab as HTMLElement).dataset.chapterIdx);
+            this.currentReaderChapterIdx = idx;
+            tabsContainer.querySelectorAll(".tkc-chapter-tab").forEach((t) => t.classList.remove("active"));
+            tab.classList.add("active");
+            this.renderChapterContent(sutra.chapters[idx], idx);
+            if (sutraAudio.getIsPlaying()) {
+              sutraAudio.playSutra(sutra, idx, 0);
+            }
+          });
+        });
+      } else {
+        tabsContainer.classList.add("hidden");
+      }
+    }
+
+    // Render nội dung chương hiện tại
+    this.renderChapterContent(sutra.chapters[this.currentReaderChapterIdx], this.currentReaderChapterIdx);
+
+    // Cập nhật thông tin audio dock
+    const audioName = document.getElementById("tkc-audio-name");
+    const audioVerse = document.getElementById("tkc-audio-current-verse");
+    if (audioName) {
+      audioName.innerText = `${sutra.title} (${sutra.chapters[this.currentReaderChapterIdx]?.title || ""})`;
+    }
+    if (audioVerse) {
+      audioVerse.innerText = autoPlay ? "Đang chuẩn bị đọc..." : "Nhấn nút ▶ để nghe đọc kinh thiền vị";
+    }
+
+    if (autoPlay) {
+      sutraAudio.playSutra(sutra, this.currentReaderChapterIdx, 0);
+    }
+  }
+
+  private renderChapterContent(chapter: SutraChapter, chapterIdx: number) {
+    const curTitleEl = document.getElementById("tkc-current-chapter-title");
+    if (curTitleEl) {
+      curTitleEl.innerText = chapter.title;
+    }
+
+    const flowContainer = document.getElementById("tkc-verses-flow");
+    if (!flowContainer) return;
+
+    flowContainer.innerHTML = chapter.verses.map((verse, idx) => `
+      <div class="tkc-verse-item" data-verse-idx="${idx}" title="Nhấp vào để nghe đọc câu kinh này">
+        <span class="tkc-verse-num">${idx + 1}</span>
+        <span class="tkc-verse-text" style="font-size: ${this.sutraFontSize}px;">${verse}</span>
+        <button type="button" class="tkc-verse-play-btn" title="Nghe câu này">🔊</button>
+      </div>
+    `).join("");
+
+    // Click vào câu kinh để nghe phát ngay câu đó
+    flowContainer.querySelectorAll(".tkc-verse-item").forEach((item) => {
+      item.addEventListener("click", () => {
+        const vIdx = Number((item as HTMLElement).dataset.verseIdx);
+        if (this.selectedSutra) {
+          sutraAudio.playSutra(this.selectedSutra, chapterIdx, vIdx);
+        }
+      });
+    });
+  }
+
+  private changeSutraFontSize(delta: number) {
+    this.sutraFontSize = Math.max(14, Math.min(26, this.sutraFontSize + delta));
+    const verseTexts = document.querySelectorAll<HTMLElement>(".tkc-verse-text");
+    verseTexts.forEach((el) => {
+      el.style.fontSize = `${this.sutraFontSize}px`;
+    });
+  }
+
+  private toggleSutraTheme() {
+    this.isSutraParchmentTheme = !this.isSutraParchmentTheme;
+    const sheet = document.getElementById("tkc-parchment-sheet");
+    const themeBtn = document.getElementById("btn-tkc-theme-toggle");
+    if (sheet) {
+      sheet.classList.toggle("dark-zen-theme", !this.isSutraParchmentTheme);
+    }
+    if (themeBtn) {
+      themeBtn.innerText = this.isSutraParchmentTheme ? "📜 Nền Giấy" : "🌙 Nền Đêm";
     }
   }
 }
