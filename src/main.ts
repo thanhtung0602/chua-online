@@ -629,6 +629,11 @@ class ChuaAnLacGame {
         this.water.setTimeOfDay(newTime);
       },
       onTeleport: (location) => {
+        if (this.player.action === "meditate" || this.gameUI.getIsMeditating()) {
+          this.player.setAction("idle");
+          this.exitCushionSeat();
+          this.gameUI.stopMeditation();
+        }
         if (location === "main_hall") {
           // Bước vào chính điện đại thụ: đứng trang nghiêm trên đại lộ trung tâm trước Tam Thế Phật
           this.player.teleportTo(0, -18.0, 0.65, Math.PI);
@@ -688,6 +693,11 @@ class ChuaAnLacGame {
         }
       },
       onTeleportToCoords: (x, z, y = 0, locationName) => {
+        if (this.player.action === "meditate" || this.gameUI.getIsMeditating()) {
+          this.player.setAction("idle");
+          this.exitCushionSeat();
+          this.gameUI.stopMeditation();
+        }
         this.player.teleportTo(x, z, y, Math.PI);
         this.cameraYaw = 0;
         this.targetYaw = 0;

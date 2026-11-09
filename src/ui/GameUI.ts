@@ -2254,6 +2254,13 @@ export class GameUI {
       this.handleDonationCompletedRemote(data);
     });
 
+    // Lắng nghe đồng bộ điểm công đức chính xác từ MongoDB Cloud
+    network.onPlayerMeritSync((data) => {
+      if (data && typeof data.camLoToday === "number") {
+        this.setMeritPoints(data.camLoToday);
+      }
+    });
+
     // 14.1. Badge Số Lượng Người Trong Phòng Chiêm Bái
     document.getElementById("btn-room-count-badge")?.addEventListener("click", () => {
       this.appendChatMessage(
@@ -3308,11 +3315,6 @@ export class GameUI {
       const secs = (this.meditateTimer % 60).toString().padStart(2, "0");
       const el = document.getElementById("zen-time");
       if (el) el.innerText = `${mins}:${secs}`;
-
-      // Mỗi 30 giây thiền cộng 1 Điểm Công Đức
-      if (this.meditateTimer % 30 === 0) {
-        this.incrementCamLo(1);
-      }
     }, 1000);
   }
 
@@ -3728,14 +3730,17 @@ export class GameUI {
     const myRankEl = document.getElementById("my-standing-rank");
     const myDropsEl = document.getElementById("my-standing-drops");
 
-    if (myNameEl) myNameEl.innerText = this.playerName;
+    const cleanName = (this.playerName || "").replace(/\s*#\d+$/, "").trim();
+    if (myNameEl) myNameEl.innerText = cleanName;
 
-    const isCurrentMonk = this.playerName.startsWith("Thích ") || authService.isMonk();
+    const isCurrentMonk = this.playerName.startsWith("Thích ") || cleanName.startsWith("Thích ") || authService.isMonk();
     const isLogged = authService.isLoggedIn();
-    const localPoints = isLogged ? getSavedMeritPoints(this.playerName) : 0;
 
     if (isCurrentMonk) {
-      const myMonkIdx = monasticList.findIndex((e) => e.name === this.playerName);
+      const myMonkIdx = monasticList.findIndex((e) => {
+        const entryClean = (e.name || "").replace(/\s*#\d+$/, "").trim();
+        return entryClean === cleanName || e.name === this.playerName;
+      });
       if (myMonkIdx !== -1) {
         const rank = myMonkIdx + 1;
         const entry = monasticList[myMonkIdx];
@@ -3752,29 +3757,20 @@ export class GameUI {
             myRankEl.innerText = `🙏 Hạng #${rank} - Hòa Thượng Tăng Chúng`;
           }
         }
-        const serverPoints = entry.camLoToday || 0;
-        if (isLogged) {
-          const bestPoints = Math.max(localPoints, serverPoints);
-          if (bestPoints > serverPoints) {
-            network.emitEarnCamLo(this.playerName, this.playerGender, bestPoints - serverPoints, "Đồng bộ điểm công đức", true);
-          }
-          if (myDropsEl) myDropsEl.innerText = bestPoints.toLocaleString();
-          this.setMeritPoints(bestPoints);
-        } else {
-          if (myDropsEl) myDropsEl.innerText = serverPoints.toLocaleString();
-          this.setMeritPoints(serverPoints);
-        }
+        const serverPoints = typeof entry.camLoToday === "number" ? entry.camLoToday : 0;
+        if (myDropsEl) myDropsEl.innerText = serverPoints.toLocaleString();
+        this.setMeritPoints(serverPoints);
       } else {
         if (myRankEl) myRankEl.innerText = "🪷 Tăng Đoàn: Chưa có điểm hôm nay";
-        const curCounter = isLogged ? Math.max(this.getMeritPoints(), localPoints) : this.getMeritPoints();
-        if (curCounter > 0 && isLogged) {
-          network.emitEarnCamLo(this.playerName, this.playerGender, curCounter, "Khôi phục điểm công đức", true);
-        }
-        if (myDropsEl) myDropsEl.innerText = curCounter.toLocaleString();
-        this.setMeritPoints(curCounter);
+        const curPoints = isLogged ? getSavedMeritPoints(this.playerName) : 0;
+        if (myDropsEl) myDropsEl.innerText = curPoints.toLocaleString();
+        this.setMeritPoints(curPoints);
       }
     } else {
-      const myLayIdx = layList.findIndex((e) => e.name === this.playerName);
+      const myLayIdx = layList.findIndex((e) => {
+        const entryClean = (e.name || "").replace(/\s*#\d+$/, "").trim();
+        return entryClean === cleanName || e.name === this.playerName;
+      });
       if (myLayIdx !== -1) {
         const rank = myLayIdx + 1;
         const entry = layList[myLayIdx];
@@ -3791,26 +3787,14 @@ export class GameUI {
             myRankEl.innerText = `🌿 Hạng #${rank} - Thiện Tín Cư Sĩ`;
           }
         }
-        const serverPoints = entry.camLoToday || 0;
-        if (isLogged) {
-          const bestPoints = Math.max(localPoints, serverPoints);
-          if (bestPoints > serverPoints) {
-            network.emitEarnCamLo(this.playerName, this.playerGender, bestPoints - serverPoints, "Đồng bộ điểm công đức", false);
-          }
-          if (myDropsEl) myDropsEl.innerText = bestPoints.toLocaleString();
-          this.setMeritPoints(bestPoints);
-        } else {
-          if (myDropsEl) myDropsEl.innerText = serverPoints.toLocaleString();
-          this.setMeritPoints(serverPoints);
-        }
+        const serverPoints = typeof entry.camLoToday === "number" ? entry.camLoToday : 0;
+        if (myDropsEl) myDropsEl.innerText = serverPoints.toLocaleString();
+        this.setMeritPoints(serverPoints);
       } else {
         if (myRankEl) myRankEl.innerText = "🌸 Cư Sĩ: Chưa có điểm hôm nay";
-        const curCounter = isLogged ? Math.max(this.getMeritPoints(), localPoints) : this.getMeritPoints();
-        if (curCounter > 0 && isLogged) {
-          network.emitEarnCamLo(this.playerName, this.playerGender, curCounter, "Khôi phục điểm công đức", false);
-        }
-        if (myDropsEl) myDropsEl.innerText = curCounter.toLocaleString();
-        this.setMeritPoints(curCounter);
+        const curPoints = isLogged ? getSavedMeritPoints(this.playerName) : 0;
+        if (myDropsEl) myDropsEl.innerText = curPoints.toLocaleString();
+        this.setMeritPoints(curPoints);
       }
     }
   }

@@ -15,4 +15,4 @@ services:
       - key: PORT
         value: 3001
       - key: APP_VERSION
-        value: 1.2.0
+        value: 1.2.1
