@@ -468,6 +468,7 @@ class ChuaAnLacGame {
           if (
             obj.name === "seat_abbot" ||
             obj.name.startsWith("seat_senior_monk_") ||
+            obj.name.startsWith("seat_tkc_") ||
             obj.name.startsWith("cushion_")
           ) {
             let fbX: number | undefined;
@@ -1001,15 +1002,16 @@ class ChuaAnLacGame {
         this.gameUI.stopMeditation();
         return;
       }
-      const inHall = this.player.worldZ <= -13.0 && this.player.worldZ >= -48.5 && Math.abs(this.player.worldX) <= 19.5;
-      if (!inHall) {
+      const inMainHall = this.player.worldZ <= -13.0 && this.player.worldZ >= -48.5 && Math.abs(this.player.worldX) <= 19.5;
+      const inTKC = this.player.worldX >= 24.0 && this.player.worldX <= 46.0 && this.player.worldZ >= -42.0 && this.player.worldZ <= -13.0;
+      if (!inMainHall && !inTKC) {
         this.speechBubbles.show(
           this.player.group,
-          "🧘 Đạo hữu hãy vào trong Đại Hùng Bảo Điện để tọa thiền trang nghiêm nhé! 🙏",
+          "🧘 Đạo hữu hãy vào trong Đại Hùng Bảo Điện hoặc Tòa Tàng Kinh Các để tọa thiền trang nghiêm nhé! 🙏",
         );
         this.gameUI.appendChatMessage(
           "Chùa",
-          "🧘 Nghi thức Tọa Thiền chỉ thực hiện được bên trong Đại Hùng Bảo Điện.",
+          "🧘 Nghi thức Tọa Thiền chỉ thực hiện được bên trong Đại Hùng Bảo Điện hoặc Tòa Tàng Kinh Các.",
         );
         return;
       }
@@ -1586,16 +1588,12 @@ class ChuaAnLacGame {
       );
     }
 
-    // 10.9. Cập nhật Prompt Tòa Tàng Kinh Các khi đứng gần hoặc đang bước vào Tòa Tàng Kinh Các / Cầu nối / Bàn kinh
-    const distPalaceCenter = Math.hypot(this.player.worldX - 35.0, this.player.worldZ - (-28.0));
-    const distWalkway = Math.hypot(this.player.worldX - 22.5, this.player.worldZ - (-28.0));
-    const distEntrance = Math.hypot(this.player.worldX - 35.0, this.player.worldZ - (-14.0));
-    const isNearTKC =
-      (this.player.worldX >= 23.5 && this.player.worldX <= 46.5 && this.player.worldZ >= -42.0 && this.player.worldZ <= -13.0) ||
-      distWalkway < 3.5 ||
-      distEntrance < 4.5 ||
-      distPalaceCenter < 14.5;
-    this.gameUI.updateTangKinhCacPrompt(isNearTKC);
+    // 10.9. Cập nhật Prompt Tòa Tàng Kinh Các: CHỈ HIỂN THỊ KHI ĐANG NGỒI TRÊN BỒ ĐOÀN (theo yêu cầu)
+    const isSittingOnCushion = Boolean(this.currentOccupiedSeat) || this.player.action === "meditate" || (this.gameUI && this.gameUI.getIsMeditating());
+    const isTKCSeat = (this.currentOccupiedSeat?.startsWith("seat_tkc_")) ?? false;
+    const isInsideTKC = this.player.worldX >= 24.0 && this.player.worldX <= 46.0 && this.player.worldZ >= -42.0 && this.player.worldZ <= -13.0;
+    const shouldShowTKCPrompt = isSittingOnCushion && (isTKCSeat || isInsideTKC);
+    this.gameUI.updateTangKinhCacPrompt(shouldShowTKCPrompt);
 
     // 11. Cập nhật bong bóng thoại
     this.speechBubbles.update();

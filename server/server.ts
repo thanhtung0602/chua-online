@@ -279,7 +279,7 @@ const app = express();
 const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3001;
-const APP_VERSION = process.env.APP_VERSION || "1.2.2";
+const APP_VERSION = process.env.APP_VERSION || "1.2.3";
 
 app.use(cors());
 app.use(express.json());
